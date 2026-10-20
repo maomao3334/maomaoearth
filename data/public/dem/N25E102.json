@@ -1,0 +1,16 @@
+{
+  "name": "SRTM N25E102 地形阴影",
+  "source": "AWS Terrain Tiles / SRTM 90m (N25E102.hgt.gz)",
+  "bbox": [
+    102.0,
+    25.0,
+    103.0,
+    26.0
+  ],
+  "minHeight": 896.0,
+  "maxHeight": 3258.0,
+  "image": "N25E102-hillshade.png",
+  "license": "SRTM (public domain, NASA/USGS); AWS Terrain Tiles",
+  "hillshadeSize": 2048,
+  "hillshadeAlpha": 255
+}

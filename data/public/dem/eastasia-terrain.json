@@ -1,0 +1,26 @@
+{
+  "name": "East Asia terrain heightmap (0.02 deg)",
+  "source": "AWS Terrain Tiles (Terrarium z7), SRTM/ETOPO composite; open data",
+  "bbox": [
+    55.0,
+    0.0,
+    150.0,
+    60.0
+  ],
+  "west": 55.0,
+  "south": 0.0,
+  "east": 150.0,
+  "north": 60.0,
+  "width": 4750,
+  "height": 3000,
+  "resolutionDeg": 0.02,
+  "rowOrder": "north-to-south",
+  "scale": 1.0,
+  "offset": 0.0,
+  "dtype": "int16-le",
+  "minHeight": 0,
+  "maxHeight": 8225,
+  "file": "eastasia-terrain.bin",
+  "hillshade": "eastasia-hillshade.png",
+  "license": "Open data (AWS Terrain Tiles / Terrarium; SRTM public domain, ETOPO)"
+}

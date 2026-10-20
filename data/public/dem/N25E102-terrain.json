@@ -1,0 +1,26 @@
+{
+  "name": "SRTM N25E102 terrain heightmap (1 arc-second full)",
+  "source": "SRTM 1 arc-second N25E102 (public domain, NASA/USGS)",
+  "bbox": [
+    102.0,
+    25.0,
+    103.0,
+    26.0
+  ],
+  "west": 102.0,
+  "south": 25.0,
+  "east": 103.0,
+  "north": 26.0,
+  "width": 3601,
+  "height": 3601,
+  "resolutionDeg": 0.0002777777777777778,
+  "rowOrder": "north-to-south",
+  "scale": 1.0,
+  "offset": 0.0,
+  "dtype": "int16-le",
+  "minHeight": 896,
+  "maxHeight": 3258,
+  "file": "N25E102-terrain.bin",
+  "hillshade": "N25E102-hillshade.png",
+  "license": "SRTM (public domain, NASA/USGS)"
+}

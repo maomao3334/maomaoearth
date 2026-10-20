@@ -1,0 +1,26 @@
+{
+  "name": "China terrain heightmap (0.02 deg)",
+  "source": "AWS Terrain Tiles (Terrarium z8), SRTM/ETOPO composite; public open data",
+  "bbox": [
+    72.0,
+    17.0,
+    136.0,
+    55.0
+  ],
+  "west": 72.0,
+  "south": 17.0,
+  "east": 136.0,
+  "north": 55.0,
+  "width": 3200,
+  "height": 1900,
+  "resolutionDeg": 0.02,
+  "rowOrder": "north-to-south",
+  "scale": 1.0,
+  "offset": 0.0,
+  "dtype": "int16-le",
+  "minHeight": 0,
+  "maxHeight": 8165,
+  "file": "china-terrain.bin",
+  "hillshade": "china-hillshade.png",
+  "license": "Open data (AWS Terrain Tiles / Terrarium; SRTM public domain, ETOPO)"
+}

@@ -1,0 +1,30 @@
+﻿import fs from 'node:fs';
+const CDP='http://127.0.0.1:9337'; const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+async function main(){
+ const t=await (await fetch(CDP+'/json/new?about:blank',{method:'PUT'})).json();
+ const ws=new WebSocket(t.webSocketDebuggerUrl); let id=0; const pend=new Map(); const errs=[]; const logs=[];
+ ws.addEventListener('message',ev=>{const m=JSON.parse(ev.data); if(m.id&&pend.has(m.id)){pend.get(m.id).resolve(m);pend.delete(m.id);} if(m.method==='Runtime.exceptionThrown')errs.push(m.params.exceptionDetails.text); if(m.method==='Log.entryAdded'){const e=m.params.entry;if(e.level==='error')logs.push(e.text);}});
+ const send=(method,params={})=>new Promise(res=>{const mid=++id;pend.set(mid,{resolve:res});ws.send(JSON.stringify({id:mid,method,params}));});
+ await new Promise(r=>ws.addEventListener('open',r,{once:true}));
+ await send('Runtime.enable'); await send('Log.enable'); await send('Page.enable'); await send('Network.enable'); await send('Network.setCacheDisabled',{cacheDisabled:true});
+ await send('Page.navigate',{url:'http://127.0.0.1:8123/?windninja=data%2Fsamples%2Fwindninja%2Fterrain_point_10-13-2026_1810_200m_vel.asc&cam=102.4,25.05,9000,-50&exag=1.3&lighting=1&sun=9.5&v='+Date.now()});
+ await sleep(24000);
+ const expr=`(async()=>{const out={};const wrap=async(k,fn)=>{try{out[k]=await fn();}catch(e){out[k+'Err']=String(e&&(e.stack||e.message)||e);}};
+  await wrap('ready',()=>MaoMaoEarth.ready().then(()=>true));
+  out.version=MaoMaoEarth.version;
+  await wrap('lightState',()=>MaoMaoEarth.lighting.getState());
+  await wrap('lightTime',()=>{MaoMaoEarth.lighting.setTime(15);return MaoMaoEarth.lighting.getState();});
+  await wrap('layerGroups',()=>MaoMaoEarth.layersPanel.getGroups().map(g=>({group:g.group||g.name,count:(g.items||g.layers||[]).length})));
+  await wrap('layersRefresh',()=>MaoMaoEarth.layersPanel.refresh());
+  await wrap('diag',()=>{const r=MaoMaoEarth.diagnostics.getReport();return {keys:Object.keys(r||{}),gpu:r&&r.gpu?r.gpu.renderer:null,layers:r&&r.layers? (r.layers.count||r.layers.length):null,fps:r&&r.fps?r.fps.fps:null};});
+  await wrap('drawJson',()=>{const g=MaoMaoEarth.draw.getGeoJSON();return {type:g.type,features:g.features.length};});
+  await wrap('profile',()=>({candidates:(window.LEProfile.getCandidates()||[]).length}));
+  await wrap('apiPresent',()=>({lighting:!!MaoMaoEarth.lighting,layersPanel:!!MaoMaoEarth.layersPanel,diagnostics:!!MaoMaoEarth.diagnostics,draw:!!MaoMaoEarth.draw,profile:!!MaoMaoEarth.profile}));
+  return out;})()`;
+ const r=await send('Runtime.evaluate',{expression:expr,returnByValue:true,awaitPromise:true});
+ console.log(JSON.stringify({errs,logs,val:r.result&&r.result.result?r.result.result.value:r.result},null,2).slice(0,6000));
+ const shot=await send('Page.captureScreenshot',{format:'png'});
+ fs.writeFileSync('G:/sh/local-earth/docs/testdata/p1-acceptance.png',Buffer.from(shot.result.data,'base64'));
+ ws.close(); await fetch(CDP+'/json/close/'+t.id);
+}
+main().catch(e=>{console.error(e);process.exit(1);});

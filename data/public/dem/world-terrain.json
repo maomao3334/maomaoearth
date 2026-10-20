@@ -1,0 +1,26 @@
+{
+  "name": "World terrain heightmap (0.1 deg)",
+  "source": "AWS Terrain Tiles (Terrarium z4), SRTM/ETOPO composite; open data",
+  "bbox": [
+    -180.0,
+    -85.0,
+    180.0,
+    85.0
+  ],
+  "west": -180.0,
+  "south": -85.0,
+  "east": 180.0,
+  "north": 85.0,
+  "width": 3600,
+  "height": 1700,
+  "resolutionDeg": 0.1,
+  "rowOrder": "north-to-south",
+  "scale": 1.0,
+  "offset": 0.0,
+  "dtype": "int16-le",
+  "minHeight": 0,
+  "maxHeight": 11500,
+  "file": "world-terrain.bin",
+  "hillshade": "world-hillshade.png",
+  "license": "Open data (AWS Terrain Tiles / Terrarium; SRTM public domain, ETOPO)"
+}

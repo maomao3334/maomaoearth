@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self' blob: data:; script-src 'self' blob: 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; worker-src 'self' blob:; connect-src 'self' blob: data:; font-src 'self' data:; media-src 'self' blob:;" />
+  <title>本地地球 Local Earth</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='15' fill='%230b1118'/%3E%3Ccircle cx='16' cy='16' r='9' fill='none' stroke='%237ee0c0' stroke-width='2'/%3E%3Cellipse cx='16' cy='16' rx='9' ry='4' fill='none' stroke='%233ea6ff' stroke-width='2'/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="vendor/cesium/Widgets/widgets.css" />
+  <link rel="stylesheet" href="css/app.css" />
+  <link rel="stylesheet" href="css/tools.css" />
+  <script>window.CESIUM_BASE_URL = 'vendor/cesium/';</script>
+  <script src="vendor/cesium/Cesium.js"></script>
+</head>
+<body>
+  <header id="topbar">
+    <div class="brand" title="完全离线运行的本地 GIS">
+      <span class="brand-mark">◍</span>
+      <span class="brand-name">本地地球</span>
+      <span class="brand-sub">Local Earth</span>
+      <span class="offline-badge" title="运行时不访问互联网">离线</span>
+    </div>
+
+    <div class="searchbox">
+      <input id="search-input" type="text" autocomplete="off" spellcheck="false"
+             placeholder="搜索地名 / 地标（本地索引）" aria-label="搜索地名或地标" />
+      <span id="search-badge" class="search-badge hidden" title="离线中国城市地名库">地名 --</span>
+      <div id="search-results" class="search-results hidden" role="listbox"></div>
+    </div>
+
+    <div class="top-actions">
+      <button id="btn-open" class="btn primary" title="打开 KML / KMZ / GeoJSON / GeoTIFF">打开数据</button>
+      <button id="btn-home" class="btn" title="回到全球视角">回到全球</button>
+      <button id="btn-perf" class="btn" title="性能模式：自动/流畅/均衡/高画质">性能：自动</button>
+    <button id="btn-2d" class="btn" title="切换 2D / 3D">2D</button>
+      <button id="btn-help" class="btn icon" title="帮助">?</button>
+    </div>
+  </header>
+
+  <div id="main">
+    <aside id="sidebar">
+      <section class="side-section">
+        <h3>常用工具</h3>
+        <button id="btn-goto" class="wide">飞到坐标…</button>
+        <div class="row2">
+          <button id="btn-measure-distance" class="wide">测距</button>
+          <button id="btn-measure-area" class="wide">测面积</button>
+        </div>
+        <button id="btn-clear-measure" class="wide subtle">清除测量</button>
+      </section>
+
+      <section class="side-section">
+        <h3>公开数据（已内置·离线）</h3>
+        <div class="row2">
+          <button id="btn-pub-admin0" class="wide">详细国界</button>
+          <button id="btn-pub-rivers" class="wide">河流</button>
+        </div>
+        <div class="row2">
+          <button id="btn-pub-lakes" class="wide">湖泊</button>
+          <button id="btn-pub-places" class="wide">城市</button>
+        </div>
+        <button id="btn-pub-dem" class="wide">SRTM 地形阴影（示例区）</button>
+        <button id="btn-terrain" class="wide">3D 地形（开/关）</button>
+        <div class="terrain-exag" title="地形高度夸张倍数（仅影响显示，不用于量测）">
+          <label for="terrain-exaggeration">地形夸张</label>
+          <input id="terrain-exaggeration" type="range" min="1" max="3" step="0.1" value="1"
+                 aria-label="地形夸张倍数" />
+          <span id="terrain-exaggeration-value" class="value">1.0×</span>
+          <button id="terrain-exaggeration-reset" class="exag-reset" type="button" title="重置为 1.0×（快捷键 1）">重置</button>
+        </div>
+        <button id="btn-imagery" class="wide">卫星影像（开）</button>
+      </section>
+
+      <section class="side-section" id="lighting-section">
+        <h3>实时光照 <span id="lighting-state" class="count">关</span></h3>
+        <div class="row2">
+          <button id="lighting-toggle" class="wide" title="开启/关闭太阳光照">开启光照</button>
+          <button id="lighting-reset" class="wide subtle" title="关闭光照，时间恢复 12:00 UTC">重置</button>
+        </div>
+        <div class="lighting-time">
+          <label for="lighting-time">时间</label>
+          <input id="lighting-time" type="range" min="0" max="24" step="0.25" value="12"
+                 aria-label="一天中的时间（小时，UTC）" />
+          <span id="lighting-time-value" class="value">12:00</span>
+        </div>
+        <div class="lighting-meta">
+          <span id="lighting-utc">UTC 12:00</span>
+          <span id="lighting-local">本地 --:--</span>
+          <span id="lighting-sun">方位 -- · 高度 --</span>
+        </div>
+        <label class="lighting-enhance" title="降低影像层透明度，让本地地形阴影（hillshade）更明显">
+          <input id="lighting-shadow-enhance" type="checkbox" />
+          阴影增强（需 3D 地形）
+        </label>
+        <p class="side-note" id="lighting-note">CustomHeightmap 地形无顶点法线：仅昼夜明暗，无地形起伏阴影。</p>
+      </section>
+
+      <section class="side-section" id="windninja-section">
+        <h3>Wind3D / 工程 / 导出</h3>
+        <div class="row2">
+          <button id="btn-windninja" class="wide" title="选择 WindNinja 结果文件夹（windninja/&lt;时间&gt;/h050m/r0200m/）">Wind3D 目录</button>
+          <button id="btn-wn-clear" class="wide subtle" title="清除当前风场">清除风场</button>
+        </div>
+        <div id="wn-scene-row" class="wn-scene-row hidden">
+          <button id="wn-prev" type="button" title="上一场景">◀</button>
+          <select id="wn-scene-select" aria-label="Wind3D 场景"></select>
+          <button id="wn-play" type="button" class="wn-play" title="自动播放场景">▶</button>
+          <button id="wn-next" type="button" title="下一场景">▶</button>
+        </div>
+        <div class="wind-mode-row" id="wind-mode-row" role="group" aria-label="风场显示模式">
+          <button type="button" class="wind-mode-btn" data-windmode="particles" title="仅显示风场粒子动画">粒子</button>
+          <button type="button" class="wind-mode-btn tool-active" data-windmode="arrows" title="仅显示 Wind3D 箭头">箭头</button>
+          <button type="button" class="wind-mode-btn" data-windmode="both" title="同时显示粒子和箭头">两者</button>
+        </div>
+        <div class="particle-row">
+          <select id="particle-density" aria-label="粒子密度">
+            <option value="low">低 600</option>
+            <option value="medium" selected>中 1200</option>
+            <option value="high">高 2200</option>
+          </select>
+          <button id="btn-particle-play" type="button" title="开始/停止风场粒子动画">播放粒子</button>
+          <button id="btn-wind-profile" type="button" title="垂直风廓线：多高度场景点选与 3D 高度切片">风廓线</button>
+        </div>
+        <p class="side-note" id="particle-note">粒子：等待 Wind3D 风场数据…</p>
+        <div class="row2">
+          <button id="btn-project-save" class="wide" title="保存为 .leproj 工程文件">保存工程</button>
+          <button id="btn-project-open" class="wide" title="打开 .leproj 工程文件">打开工程</button>
+        </div>
+        <div class="row2 export-row">
+          <button id="btn-export-png" class="wide" title="导出当前视图为 PNG（含标题/图例）">导出 PNG</button>
+          <button id="btn-export-pdf" class="wide" title="打开打印窗口，可另存为 PDF">导出 PDF</button>
+          <button id="btn-export-geojson" class="wide" title="导出当前 Wind3D 采样点为 GeoJSON">GeoJSON</button>
+          <button id="btn-export-kmz" class="wide" title="导出当前风场为 KMZ（含图例）">KMZ</button>
+        </div>
+      </section>
+
+      <section class="side-section" id="snapshot-section">
+        <h3>快照 / 分享</h3>
+        <div class="row2">
+          <button id="btn-snapshot-html" class="wide" title="导出单文件 HTML 快照（内嵌截图 / 相机 / 图层 / 数据来源与版权）">HTML 快照</button>
+          <button id="btn-share-link" class="wide" title="复制含 cam / exag / terrain / imagery / windninja / perf 的分享链接">复制分享链接</button>
+        </div>
+        <button id="btn-snapshot-preview" class="wide subtle" title="在新标签页打开 HTML 快照预览">预览快照</button>
+        <p class="side-note">快照为单文件 HTML（截图与信息全部内嵌），离线可打开、无外部请求；分享链接可在本机恢复同一视角、地形/影像与 Wind3D 风场。</p>
+      </section>
+
+      <section class="side-section" id="draw-section">
+        <h3>绘制与标注 <span id="draw-count" class="count">0</span></h3>
+        <div class="draw-modes">
+          <button id="btn-draw-point" class="wide" data-mode="point" title="绘制点（单击地图添加）">点</button>
+          <button id="btn-draw-line" class="wide" data-mode="line" title="绘制线（单击加点，双击结束）">线</button>
+          <button id="btn-draw-polygon" class="wide" data-mode="polygon" title="绘制面（单击加点，双击结束）">面</button>
+        </div>
+        <div class="draw-style">
+          <label for="draw-color">颜色</label>
+          <select id="draw-color" aria-label="绘制颜色">
+            <option value="#ffd93b">黄</option>
+            <option value="#3ea6ff">蓝</option>
+            <option value="#7ee0c0">青</option>
+            <option value="#ff6b6b">红</option>
+            <option value="#ffffff">白</option>
+          </select>
+          <label for="draw-width">线宽</label>
+          <select id="draw-width" aria-label="线宽">
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3" selected>3</option>
+            <option value="4">4</option>
+            <option value="6">6</option>
+          </select>
+        </div>
+        <div class="row2">
+          <button id="btn-draw-undo" class="wide subtle" title="撤销最后一个顶点/要素">撤销</button>
+          <button id="btn-draw-clear" class="wide subtle" title="清空所有绘制要素">清空</button>
+        </div>
+        <div class="row2">
+          <button id="btn-draw-export" class="wide" title="导出绘制要素为 GeoJSON">导出 GeoJSON</button>
+          <button id="btn-draw-import" class="wide" title="导入 GeoJSON 为绘制要素">导入 GeoJSON</button>
+        </div>
+        <div class="row2">
+          <button id="btn-draw-stop" class="wide subtle" disabled title="结束当前绘制（等同双击）">结束绘制</button>
+          <button id="btn-profile" class="wide" title="对最后一条绘制线/测量线生成高程剖面">高程剖面</button>
+        </div>
+      </section>
+
+      <section class="side-section" id="data-section">
+        <h3>数据状态 <span id="data-state" class="count">--</span></h3>
+        <ul id="data-status" class="data-status">
+          <li class="data-row">正在读取本地数据状态…</li>
+        </ul>
+        <div class="row2">
+          <button id="btn-data-terrain" class="wide" title="开启/确保 3D 地形">3D 地形</button>
+          <button id="btn-data-imagery" class="wide" title="开启/确保卫星影像">卫星影像</button>
+        </div>
+        <div class="row2">
+          <button id="btn-data-vectors" class="wide" title="一键加载未加载的本地矢量（国界/河流/湖泊/城市）">加载矢量</button>
+          <button id="btn-data-refresh" class="wide subtle" title="刷新数据状态">刷新状态</button>
+        </div>
+        <button id="btn-xyz-dir" class="wide" title="选择本地 XYZ 瓦片目录（…/z/x/y.png|jpg）">本地 XYZ 瓦片目录</button>
+        <p class="side-note">MBTiles 暂不支持（后续版本）；COG / GeoTIFF 请用「打开数据」导入（按单幅贴图叠加、不做重投影）。</p>
+      </section>
+
+      <section class="side-section" id="diag-section">
+        <h3>应用诊断</h3>
+        <button id="btn-diagnostics" class="wide" title="GPU / WebGL / FPS / 内存 / 图层 / 地形 / 错误日志">打开诊断面板</button>
+        <p class="side-note">GPU · WebGL · FPS · 内存 · 图层 · 地形 · renderError / console.error</p>
+      </section>
+
+      <section class="side-section grow" id="layers-section">
+        <h3>图层 <span id="layer-count" class="count">0</span></h3>
+        <input id="layer-search" class="layer-search" type="search" autocomplete="off" spellcheck="false"
+               placeholder="搜索图层…" aria-label="搜索图层" />
+        <div id="layer-summary" class="layer-summary">共 0 层</div>
+        <ul id="layer-list" class="layer-list">
+          <li class="layer-empty">暂无图层，拖放文件或点击“打开数据”</li>
+        </ul>
+      </section>
+
+      <section class="side-section hint">
+        <p>把 <b>KML / KMZ / GeoJSON / GeoTIFF</b> 直接拖到地球上即可加载；数据全部在本机读取。</p>
+      </section>
+    </aside>
+
+    <div id="viewer" aria-label="三维地球视图"></div>
+
+    <!-- KML/KMZ 动画时间轴（由 js/kml-native.js 提供控制器，js/ui.js 绑定） -->
+    <div id="kml-timeline" class="kml-timeline hidden" role="group" aria-label="KML 时间轴">
+      <button id="kml-tl-play" type="button" class="tl-play" title="播放 / 暂停">▶</button>
+      <span id="kml-tl-label" class="tl-label">--</span>
+      <input id="kml-tl-range" class="tl-range" type="range" min="0" max="0" step="1" value="0"
+             aria-label="时间帧" />
+      <span id="kml-tl-count" class="tl-count">0 / 0</span>
+    </div>
+
+    <!-- 类似 Google Earth 的视角控制：旋转 / 俯仰 / 缩放 / 复位正北 -->
+    <div id="nav-controls" class="nav-controls" role="group" aria-label="视角控制">
+      <button id="nav-rotate-left" type="button" title="向左旋转视图">⟲</button>
+      <button id="nav-rotate-right" type="button" title="向右旋转视图">⟳</button>
+      <button id="nav-tilt-up" type="button" title="俯仰向上（更接近平视）">▲</button>
+      <button id="nav-tilt-down" type="button" title="俯仰向下（更接近俯视）">▼</button>
+      <button id="nav-zoom-in" type="button" title="放大">＋</button>
+      <button id="nav-zoom-out" type="button" title="缩小">－</button>
+      <button id="nav-reset" type="button" class="nav-reset" title="复位正北（保持位置，回正北俯视）">北</button>
+    </div>
+
+    <!-- 绘制提示（绘制模式下显示） -->
+    <div id="draw-hud" class="draw-hud hidden" role="status"></div>
+
+    <!-- 诊断面板 -->
+    <div id="diag-panel" class="le-panel diag-panel hidden" role="dialog" aria-modal="false" aria-label="应用诊断面板">
+      <div class="le-panel-head">
+        <h4>应用诊断 <span id="diag-badge" class="le-badge">FPS --</span></h4>
+        <div class="le-panel-actions">
+          <button id="diag-copy" type="button" title="复制诊断 JSON 到剪贴板">复制 JSON</button>
+          <button id="diag-download" type="button" title="下载诊断日志（JSON）">下载日志</button>
+          <button id="diag-refresh" type="button" title="刷新数据">刷新</button>
+          <button id="diag-reload" type="button" title="重新加载页面">重载</button>
+          <button id="diag-close" class="le-close" type="button" title="关闭">×</button>
+        </div>
+      </div>
+      <div class="diag-body">
+        <section>
+          <h5>渲染 / 显示</h5>
+          <dl id="diag-render"></dl>
+        </section>
+        <section>
+          <h5>场景 / 图层</h5>
+          <dl id="diag-scene"></dl>
+        </section>
+        <section>
+          <h5>地形 / KML</h5>
+          <dl id="diag-terrain"></dl>
+        </section>
+        <section>
+          <h5>最近 scene.renderError</h5>
+          <pre id="diag-render-error" class="diag-error">暂无</pre>
+          <p id="diag-note" class="side-note"></p>
+        </section>
+        <section>
+          <h5>console.error（最近 50 条）</h5>
+          <ol id="diag-console" class="diag-log"><li class="empty">暂无 console.error</li></ol>
+        </section>
+      </div>
+    </div>
+
+    <!-- 高程剖面面板 -->
+    <div id="profile-panel" class="le-panel profile-panel hidden" role="dialog" aria-modal="false" aria-label="高程剖面">
+      <div class="le-panel-head">
+        <h4>高程剖面</h4>
+        <div class="le-panel-actions">
+          <select id="profile-line-select" aria-label="选择剖面线"></select>
+          <button id="profile-refresh" type="button" title="重新采样">刷新</button>
+          <button id="profile-export-png" type="button" title="导出剖面 PNG">导出 PNG</button>
+          <button id="profile-close" class="le-close" type="button" title="关闭">×</button>
+        </div>
+      </div>
+      <canvas id="profile-canvas" width="720" height="260" aria-label="高程剖面图"></canvas>
+      <div id="profile-stats" class="profile-stats"></div>
+      <p id="profile-note" class="side-note"></p>
+    </div>
+
+    <!-- 垂直风廓线 / 3D 高度切片面板（P2） -->
+    <div id="wind-profile-panel" class="le-panel wind-profile-panel hidden" role="dialog" aria-modal="false" aria-label="垂直风廓线">
+      <div class="le-panel-head">
+        <h4>垂直风廓线 <span id="wp-badge" class="le-badge">--</span></h4>
+        <div class="le-panel-actions">
+          <label class="wp-slice-toggle" title="把各高度场景的箭头抬升到 地形+高度 叠加显示">
+            <input id="wp-slices" type="checkbox" /> 3D 高度切片
+          </label>
+          <button id="wp-refresh" type="button" title="重新读取多高度场景">刷新</button>
+          <button id="wp-clear" type="button" title="清除选点">清除</button>
+          <button id="wp-close" class="le-close" type="button" title="关闭">×</button>
+        </div>
+      </div>
+      <canvas id="wp-canvas" width="720" height="260" aria-label="垂直风廓线图"></canvas>
+      <div id="wp-stats" class="wp-stats"></div>
+      <p id="wp-note" class="side-note"></p>
+    </div>
+  </div>
+
+  <footer id="statusbar">
+    <span id="status-text">正在启动本地地球…</span>
+    <span id="camera-text" class="coords" title="相机位置"></span>
+    <span id="coords-text" class="coords" title="点击复制坐标">纬度 --&nbsp;&nbsp;经度 --&nbsp;&nbsp;高度 --</span>
+  </footer>
+
+  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+
+  <div id="loading" class="loading hidden">
+    <div class="spinner"></div>
+    <div id="loading-text">正在加载…</div>
+  </div>
+
+  <div id="drop-overlay" class="drop-overlay hidden">
+    <div class="drop-card">释放以加载 KML / KMZ / GeoJSON / GeoTIFF</div>
+  </div>
+
+  <div id="help-dialog" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="help-title">
+    <div class="modal-card">
+      <h2 id="help-title">本地地球 · 使用说明</h2>
+      <ol>
+        <li><b>看地球</b>：左键拖动旋转，滚轮缩放，右键拖动缩放，中键（或 Ctrl+左键）倾斜；右下角视角按钮可左右旋转、上下俯仰、放大缩小、一键复位正北。</li>
+        <li><b>加数据</b>：把 KML/KMZ/GeoJSON/GeoTIFF 拖进来，或点“打开数据”。</li>
+        <li><b>找地方</b>：顶部搜索框输入地名（来自已加载数据和内置地名库）。</li>
+        <li><b>量距离</b>：点“测距/测面积”，在地球上依次点击；右侧面板可查看结果。</li>
+        <li><b>3D 地形</b>：侧栏可开/关地形、开关卫星影像，拖动「地形夸张」滑杆（1.0–3.0×）；快捷键 <b>1</b> 重置、<b>[</b>/<b>]</b> 每次 ±0.1（输入框聚焦时不生效），数值会自动记住（<code>?exag=</code> 优先）。</li>
+        <li><b>实时光照</b>：侧栏「实时光照」开启后拖动时间滑杆（0–24 h，UTC，固定 2024-04-03）即可看到昼夜明暗；「阴影增强」会降低影像透明度以突出本地地形阴影；也可用 <code>?lighting=1&amp;sun=9.5</code>。注意：本地地形 Provider 无顶点法线，Cesium 只做昼夜明暗，没有地形起伏自阴影。</li>
+        <li><b>绘制与剖面</b>：点/线/面模式在地球上点击绘制，双击结束，<b>Esc</b> 取消，可撤销/清空/导入导出 GeoJSON；画线后点「高程剖面」按 100–300 点采样 <code>LE.heightAt</code> 生成剖面并导出 PNG。</li>
+        <li><b>图层/诊断</b>：图层面板支持搜索、分组、显隐、定位、删除，影像层还可调透明度与上下移；「打开诊断面板」可查看 GPU/WebGL/FPS/内存/地形/KML 与最近错误，并复制/下载诊断 JSON。</li>
+        <li><b>风场粒子 / 风廓线</b>：加载 Wind3D 风场后可在侧栏切换「粒子 / 箭头 / 两者」与粒子密度（低 600、中 1200、高 2200），也可用 <code>?windmode=particles|arrows|both&amp;particles=1200</code>；多高度目录（h050m/h100m/h200m）载入后点「风廓线」，单击地图选点即可查看各高度风速曲线，并可开启「3D 高度切片」叠加抬升箭头。</li>
+        <li><b>地名搜索 / 快照分享</b>：顶部搜索支持中文名、拼音、拼音首字母与 <code>经度,纬度</code>（如 <code>102.4,25.05</code>），最近搜索自动记忆；「HTML 快照」导出内嵌截图的单文件 HTML，「复制分享链接」生成包含视角/地形/影像/风场/性能参数的 URL。</li>
+      </ol>
+      <p class="muted">本程序完全离线运行：底图为 NASA Blue Marble（公有领域），国界/城市为 Natural Earth（公有领域），三维引擎为 CesiumJS（Apache-2.0）。卫星影像：Sentinel-2 cloudless by EOX IT Services GmbH（CC BY 4.0），仅本地缓存。</p>
+      <p class="muted" id="help-version"></p>
+      <button id="help-close" class="btn primary">知道了</button>
+    </div>
+  </div>
+
+  <input id="file-input" type="file" multiple class="hidden-input"
+         accept=".kml,.kmz,.geojson,.json,.tif,.tiff,.gtiff" />
+  <input id="windninja-dir-input" type="file" webkitdirectory directory multiple class="hidden-input" />
+  <input id="project-file-input" type="file" accept=".leproj,.json" class="hidden-input" />
+  <input id="draw-geojson-input" type="file" accept=".geojson,.json" class="hidden-input" />
+  <input id="xyz-dir-input" type="file" webkitdirectory directory multiple class="hidden-input" />
+
+  <script type="module">
+    import * as GeoTIFF from './vendor/geotiff/geotiff.js';
+    window.GeoTIFF = GeoTIFF;
+    window.dispatchEvent(new Event('geotiff-ready'));
+  </script>
+  <script src="js/layers.js"></script>
+  <script src="js/terrain.js"></script>
+  <script src="js/kml-native.js"></script>
+  <script src="js/importers.js"></script>
+  <script src="js/tools.js"></script>
+  <script src="js/perf.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/windninja.js"></script>
+  <script src="js/project.js"></script>
+  <script src="js/exporter.js"></script>
+  <script src="js/lighting.js"></script>
+  <script src="js/layers-panel.js"></script>
+  <script src="js/diagnostics.js"></script>
+  <script src="js/draw.js"></script>
+  <script src="js/profile.js"></script>
+  <script src="js/places.js"></script>
+  <script src="js/wind-particles.js"></script>
+  <script src="js/wind-profile.js"></script>
+  <script src="js/snapshot.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

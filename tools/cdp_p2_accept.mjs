@@ -1,0 +1,31 @@
+﻿import fs from 'node:fs';
+const CDP='http://127.0.0.1:9337'; const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+async function main(){
+ const t=await (await fetch(CDP+'/json/new?about:blank',{method:'PUT'})).json();
+ const ws=new WebSocket(t.webSocketDebuggerUrl); let id=0; const pend=new Map(); const errs=[];
+ ws.addEventListener('message',ev=>{const m=JSON.parse(ev.data); if(m.id&&pend.has(m.id)){pend.get(m.id).resolve(m);pend.delete(m.id);} if(m.method==='Runtime.exceptionThrown')errs.push(m.params.exceptionDetails.text);});
+ const send=(method,params={})=>new Promise(res=>{const mid=++id;pend.set(mid,{resolve:res});ws.send(JSON.stringify({id:mid,method,params}));});
+ await new Promise(r=>ws.addEventListener('open',r,{once:true}));
+ await send('Runtime.enable'); await send('Page.enable'); await send('Network.enable'); await send('Network.setCacheDisabled',{cacheDisabled:true});
+ await send('Page.navigate',{url:'http://127.0.0.1:8123/?windninja=data%2Fsamples%2Fwindninja%2Fterrain_point_10-13-2026_1810_200m_vel.asc&cam=102.4,25.05,9000,-50&exag=1.3&windmode=particles&particles=1200&v='+Date.now()});
+ await sleep(24000);
+ const expr=`(async()=>{const s={};try{await MaoMaoEarth.ready();
+ s.mods=[!!window.LEWindParticles,!!window.LEWindProfile,!!window.LEPlaces,!!window.LESnapshot].join(',');
+ s.apiP2=[!!MaoMaoEarth.particles,!!MaoMaoEarth.windProfile,!!MaoMaoEarth.places,!!MaoMaoEarth.snapshot].join(',');
+ const ps=window.LEWindParticles.getStats(); s.particles={running:ps.running,count:ps.count,mode:ps.mode,fps:ps.fps};
+ const q1=window.LEPlaces.search('昆明'); s.searchKunming=Array.isArray(q1)?q1.length:(q1&&q1.length)||0;
+ const q2=window.LEPlaces.search('102.4,25.05'); s.searchCoord=Array.isArray(q2)?q2.length:(q2&&q2.length)||0;
+ const h=await window.LESnapshot.html({title:'P2 验收'}); s.snapshot={len:(h&&(h.html||h)).length,hasImage:String(h&&(h.html||h)).indexOf('data:image/png')>=0};
+ s.share=window.LESnapshot.shareLink();
+ s.placesCount=(window.LEPlaces.getDatasetStats()||{}).count;
+ }catch(e){s.err=String(e&&(e.stack||e.message)||e);} return JSON.stringify(s);})()`;
+ const r=await send('Runtime.evaluate',{expression:expr,returnByValue:true,awaitPromise:true});
+ const ro=r.result&&r.result.result;
+ console.log('EXC=',JSON.stringify(r.result&&r.result.exceptionDetails||null));
+ console.log('VAL=',ro&&ro.value);
+ console.log('ERRS=',JSON.stringify(errs));
+ const shot=await send('Page.captureScreenshot',{format:'png'});
+ fs.writeFileSync('G:/sh/local-earth/docs/testdata/p2-acceptance.png',Buffer.from(shot.result.data,'base64'));
+ ws.close(); await fetch(CDP+'/json/close/'+t.id);
+}
+main().catch(e=>{console.error(e);process.exit(1);});

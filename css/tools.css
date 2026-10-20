@@ -1,0 +1,62 @@
+/* 测量与工具相关样式（tools-dev 可扩展此文件） */
+
+.tool-active {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 2px rgba(62,166,255,.22);
+}
+
+/* 测量结果面板：悬浮在视图右上角 */
+#measure-panel {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 272px;
+  background: rgba(18,27,38,.96);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  z-index: 30;
+  box-shadow: 0 14px 34px rgba(0,0,0,.4);
+}
+#measure-panel h4 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+#measure-panel .value {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--accent-2);
+  font-variant-numeric: tabular-nums;
+}
+#measure-panel .detail { color: var(--muted); font-size: 12px; margin-top: 6px; line-height: 1.5; }
+#measure-panel .actions { display: flex; gap: 8px; margin-top: 10px; }
+#measure-panel .actions .btn { height: 30px; flex: 1; }
+
+/* 飞到坐标对话框（如 ui 模块使用自有 DOM） */
+#goto-dialog .modal-card { width: min(420px, 92vw); }
+#goto-dialog .field { display: flex; gap: 10px; margin-bottom: 10px; }
+#goto-dialog label { color: var(--muted); font-size: 12.5px; width: 58px; padding-top: 9px; }
+#goto-dialog input {
+  flex: 1;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: #0a121a;
+  color: var(--text);
+  padding: 0 10px;
+  outline: none;
+}
+#goto-dialog input:focus { border-color: var(--accent); }
+#goto-dialog .error { color: var(--danger); font-size: 12.5px; min-height: 18px; margin-bottom: 6px; }
+#goto-dialog .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }
+
+/* 搜索结果激活项键盘高亮 */
+.search-results .item.active { background: rgba(62,166,255,.18); }
+
+/* 帮助对话框中的快捷键表 */
+.shortcut-table { width: 100%; border-collapse: collapse; font-size: 12.5px; margin: 8px 0 13px; }
+.shortcut-table td { padding: 4px 6px; border-bottom: 1px solid rgba(255,255,255,.05); }
+.shortcut-table td:first-child { width: 130px; color: var(--accent-2); font-variant-numeric: tabular-nums; }
