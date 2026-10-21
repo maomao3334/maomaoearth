@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta http-equiv="Content-Security-Policy"
-        content="default-src 'self' blob: data:; script-src 'self' blob: 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; worker-src 'self' blob:; connect-src 'self' blob: data:; font-src 'self' data:; media-src 'self' blob:;" />
+        content="default-src 'self' blob: data:; script-src 'self' blob: 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: http://127.0.0.1:* http://localhost:*; worker-src 'self' blob:; connect-src 'self' blob: data: http://127.0.0.1:* http://localhost:*; font-src 'self' data:; media-src 'self' blob:;" />
   <title>本地地球 Local Earth</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='15' fill='%230b1118'/%3E%3Ccircle cx='16' cy='16' r='9' fill='none' stroke='%237ee0c0' stroke-width='2'/%3E%3Cellipse cx='16' cy='16' rx='9' ry='4' fill='none' stroke='%233ea6ff' stroke-width='2'/%3E%3C/svg%3E" />
   <link rel="stylesheet" href="vendor/cesium/Widgets/widgets.css" />
@@ -198,7 +198,8 @@
           <button id="btn-data-refresh" class="wide subtle" title="刷新数据状态">刷新状态</button>
         </div>
         <button id="btn-xyz-dir" class="wide" title="选择本地 XYZ 瓦片目录（…/z/x/y.png|jpg）">本地 XYZ 瓦片目录</button>
-        <p class="side-note">MBTiles 暂不支持（后续版本）；COG / GeoTIFF 请用「打开数据」导入（按单幅贴图叠加、不做重投影）。</p>
+        <button id="btn-mbtiles" class="wide" title="加载本地 MBTiles（需先用 MaoMaoEarth.exe mbtiles 启动瓦片服务）">加载 MBTiles…</button>
+        <p class="side-note">MBTiles：运行 <code>MaoMaoEarth.exe mbtiles 文件.mbtiles</code> 后会自动打开；也可手动填服务地址。COG / GeoTIFF 用「打开数据」导入。</p>
       </section>
 
       <section class="side-section" id="diag-section">
@@ -388,6 +389,7 @@
   <script src="js/wind-particles.js"></script>
   <script src="js/wind-profile.js"></script>
   <script src="js/snapshot.js"></script>
+  <script src="js/mbtiles.js"></script>
   <script src="js/api.js"></script>
   <script src="js/main.js"></script>
 </body>

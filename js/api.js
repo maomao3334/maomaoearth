@@ -47,7 +47,7 @@
   }
 
   var api = {
-    version: '0.3.0',
+    version: '0.4.0',
     on: on,
     ready: ready,
     whenReady: function (cb) { return ready().then(cb); },
@@ -234,6 +234,14 @@
       downloadHtml: function (opts) { return requireModule('LESnapshot', 'downloadHtml').downloadHtml(opts || {}); },
       shareLink: function () { return requireModule('LESnapshot', 'shareLink').shareLink(); },
       copyShare: function () { return requireModule('LESnapshot', 'copyShare').copyShare(); },
+    },
+
+    /** MBTiles（本地瓦片服务） */
+    mbtiles: {
+      load: function (base, token) { return requireModule('LEMBTiles', 'load').load(base, token); },
+      openDialog: function () { return requireModule('LEMBTiles', 'openDialog').openDialog(); },
+      clear: function () { return requireModule('LEMBTiles', 'clear').clear(); },
+      getState: function () { return requireModule('LEMBTiles', 'getState').getState(); },
     },
 
     /** 性能 */

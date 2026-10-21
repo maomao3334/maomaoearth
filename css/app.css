@@ -1047,3 +1047,15 @@ body {
 }
 
 
+
+/* MBTiles 对话框 */
+.modal-backdrop { position: fixed; inset: 0; z-index: 12000; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,.55); }
+.modal-panel { width: min(560px, calc(100vw - 32px)); background: #141a22; border: 1px solid #34404f; border-radius: 10px; padding: 18px 20px; color: #dfe8f3; box-shadow: 0 18px 60px rgba(0,0,0,.55); }
+.modal-panel h3 { margin: 0 0 10px; font-size: 16px; }
+.modal-panel .hint { color: #8fa3b8; font-size: 12px; line-height: 1.6; }
+.modal-panel code { color: #ffd166; }
+.modal-panel .field { display: block; margin: 10px 0; font-size: 12px; color: #9fb2c6; }
+.modal-panel .field input { display: block; width: 100%; margin-top: 5px; padding: 8px 9px; border: 1px solid #354657; border-radius: 6px; background: #0d131a; color: #e6eef7; font-size: 13px; box-sizing: border-box; }
+.modal-actions { display: flex; gap: 8px; margin-top: 14px; }
+.modal-actions button { flex: 1; padding: 8px 10px; border-radius: 6px; border: 1px solid #3b4c5e; background: #1d2833; color: #e6eef7; cursor: pointer; }
+.modal-actions button.primary { background: #1769aa; border-color: #2c7fc4; }

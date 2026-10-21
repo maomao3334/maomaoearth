@@ -170,3 +170,16 @@ MaoMaoEarth.snapshot.downloadHtml();
 MaoMaoEarth.snapshot.shareLink();
 MaoMaoEarth.snapshot.copyShare();
 ```
+
+
+## MBTiles（v0.4.0）
+
+```js
+// 先运行 MaoMaoEarth.exe mbtiles <file>，从终端复制服务地址与 token
+const info = await MaoMaoEarth.mbtiles.load('http://127.0.0.1:8140', 'TOKEN');
+MaoMaoEarth.mbtiles.getState();
+MaoMaoEarth.mbtiles.clear();
+```
+
+底层对象：`LEMBTiles`（`load/clear/getState/openDialog`）。
+详见 [MBTILES.md](MBTILES.md)。

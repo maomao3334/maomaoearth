@@ -24,6 +24,9 @@ MaoMaoEarth.exe stop
 :: 导入 WindNinja/Wind3D 结果目录并打开
 MaoMaoEarth.exe windninja "C:\path\to\windninja\...\r0200m"
 
+:: 启动本地 MBTiles 瓦片服务并打开应用（Ctrl+C 停止）
+MaoMaoEarth.exe mbtiles "D:\data\china.mbtiles"
+
 :: 帮助
 MaoMaoEarth.exe --help
 ```
@@ -34,6 +37,7 @@ MaoMaoEarth.exe --help
 maomaoearth check
 maomaoearth serve --port 8123 --no-browser
 maomaoearth windninja "D:\Wind3D\results\case\windninja\20240403T080600Z\h050m\r0200m"
+maomaoearth mbtiles "D:\data\china.mbtiles"
 ```
 
 ## 行为说明
@@ -46,6 +50,10 @@ maomaoearth windninja "D:\Wind3D\results\case\windninja\20240403T080600Z\h050m\r
 - `windninja <目录>` 会把目录中的 `*.asc` / `*.prj` / `*.cfg` / `*.csv` 复制到
   `data/samples/windninja/cli-<时间>-<目录名>/`，然后用
   `?windninja=<vel.asc>` 打开应用；原目录不被修改。
+
+- `mbtiles <文件>` 会启动 C# 瓦片服务（winsqlite3.dll，127.0.0.1 随机端口 + token），
+  并打开 `?mbtiles=<服务地址>&mbtoken=<token>`；启动器保持运行，Ctrl+C 停止瓦片服务。
+  详见 [MBTILES.md](MBTILES.md)。
 
 ## 与浏览器版共存
 
