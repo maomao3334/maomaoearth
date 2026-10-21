@@ -2,7 +2,7 @@
 
 > 完全离线、双击即用的 Windows 三维地理信息工具：本地地形、卫星影像、KML/KMZ、WindNinja/Wind3D 风场直读、粒子/风廓线、工程保存与离线出图。
 >
-> **v0.5.1** · Windows 10/11 · 无需安装、无需联网、无需构建
+> **v0.5.2** · Windows 10/11 · 无需安装、无需联网、无需构建
 
 ![Wind3D 风场与三维地形](docs/screenshots/01-wind3d-terrain.png)
 
@@ -25,6 +25,7 @@ MaomaoEarth（猫猫地球）是一个**本地优先**的三维地球应用，�
 
 - **三维地形**：全球 0.1° 底图 + 东亚 0.02° + 风场区 1″ 高精度网格；地形夸张、3D/2D 切换、地形阴影。
 - **离线影像**：NASA Blue Marble 全球底图；Sentinel-2 cloudless 东亚 z5–z8、宽域 z9–z12、风场区 z13–z14；支持本地 XYZ 目录与 GeoTIFF。
+- **底图显示修复**：低画质/无地形时国界 GeoJSON 面曾默认白色填充，盖住卫星底图；已显式改为只描边，并让缺失 S2 瓦片透明（详见 docs/MAP-DISPLAY-FIX.md）。
 - **超大 KML/KMZ 性能**：10 万级 Placemark 动画文件（如风场 timeline）按 Placemark 分片/快速解析、线动画用静态 `Primitive` 帧播放器；109 MB KML 实测从 12 s/2.4 FPS 降到 4 s/60 FPS（详见 docs/KML-PERF.md）。
 - **MBTiles 直读**：`MaoMaoEarth.exe mbtiles 文件.mbtiles` 后台启动本地瓦片服务（无命令行窗口），按 z/x/y 查 SQLite（winsqlite3，不整库载入）；支持 png/jpg/webp 栅格、**pbf/MVT 矢量瓦片**、**EPSG:3857 / EPSG:4326**、TMS/XYZ、图层透明度/排序。
 - **矢量数据**：Natural Earth 详细国界/河流/湖泊/城市；国界/河流按地形高度贴地绘制，城市点按距离显隐。
@@ -65,7 +66,7 @@ MaomaoEarth（猫猫地球）是一个**本地优先**的三维地球应用，�
 ### 方式 A：下载 Release（推荐，普通用户）
 
 1. 打开仓库的 **Releases** 页面，下载：
-   - `maomaoearth-v0.5.1.zip`（代码/程序，含 `MaoMaoEarth.exe`）
+   - `maomaoearth-v0.5.2.zip`（代码/程序，含 `MaoMaoEarth.exe`）
    - `maomaoearth-data-<日期>.zip`（离线数据包，约 190 MB）
 2. 解压程序包到任意目录（路径尽量不含空格）。
 3. 把数据包解压到同一目录，得到 `data/public/...`（覆盖/合并 `data` 目录）。
@@ -317,6 +318,7 @@ local-earth/
 - [P2 验收](docs/P2-VERIFICATION.md)：粒子方向回归、风廓线、搜索、快照、P0/P1 回归
 - [MBTiles 说明与验证](docs/MBTILES.md)：本地 SQLite 瓦片服务、TMS、4326、MVT 测试记录
 - [KML/KMZ 性能优化](docs/KML-PERF.md)：分片/快速解析、静态线 Primitive、前后对比数据
+- [底图白块修复](docs/MAP-DISPLAY-FIX.md)：国界面填充、S2 缺失瓦片透明、低画质验证
 - [MVT 解码/栅格化](docs/MVT.md)：pbf 瓦片支持范围与限制
 
 ---

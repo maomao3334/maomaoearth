@@ -659,6 +659,8 @@
       maximumLevel: spec.maxLevel,
       tileWidth: 256,
       tileHeight: 256,
+      // 数据覆盖外/缺失的 JPEG 瓦片按透明处理，避免在蓝马赛克底图上出现白色方块
+      hasAlphaChannel: true,
       credit: IMAGERY_CREDIT,
     });
     // 低层级/范围外瓦片缺失时按透明处理，避免 Cesium 抛错刷屏（浏览器网络日志仍可能显示 404）

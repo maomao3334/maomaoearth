@@ -47,7 +47,7 @@
   }
 
   var api = {
-    version: '0.5.1',
+    version: '0.5.2',
     on: on,
     ready: ready,
     whenReady: function (cb) { return ready().then(cb); },
