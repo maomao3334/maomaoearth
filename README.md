@@ -2,7 +2,7 @@
 
 > 完全离线、双击即用的 Windows 三维地理信息工具：本地地形、卫星影像、KML/KMZ、WindNinja/Wind3D 风场直读、粒子/风廓线、工程保存与离线出图。
 >
-> **v0.5.0** · Windows 10/11 · 无需安装、无需联网、无需构建
+> **v0.5.1** · Windows 10/11 · 无需安装、无需联网、无需构建
 
 ![Wind3D 风场与三维地形](docs/screenshots/01-wind3d-terrain.png)
 
@@ -25,6 +25,7 @@ MaomaoEarth（猫猫地球）是一个**本地优先**的三维地球应用，�
 
 - **三维地形**：全球 0.1° 底图 + 东亚 0.02° + 风场区 1″ 高精度网格；地形夸张、3D/2D 切换、地形阴影。
 - **离线影像**：NASA Blue Marble 全球底图；Sentinel-2 cloudless 东亚 z5–z8、宽域 z9–z12、风场区 z13–z14；支持本地 XYZ 目录与 GeoTIFF。
+- **超大 KML/KMZ 性能**：10 万级 Placemark 动画文件（如风场 timeline）按 Placemark 分片/快速解析、线动画用静态 `Primitive` 帧播放器；109 MB KML 实测从 12 s/2.4 FPS 降到 4 s/60 FPS（详见 docs/KML-PERF.md）。
 - **MBTiles 直读**：`MaoMaoEarth.exe mbtiles 文件.mbtiles` 后台启动本地瓦片服务（无命令行窗口），按 z/x/y 查 SQLite（winsqlite3，不整库载入）；支持 png/jpg/webp 栅格、**pbf/MVT 矢量瓦片**、**EPSG:3857 / EPSG:4326**、TMS/XYZ、图层透明度/排序。
 - **矢量数据**：Natural Earth 详细国界/河流/湖泊/城市；国界/河流按地形高度贴地绘制，城市点按距离显隐。
 - **Wind3D / WindNinja 直读**：读取 `*_vel.asc` + `*_ang.asc` + `.prj`，自动 UTM→WGS84，彩色贴地箭头、风速图例、多时间/高度场景切换。
@@ -64,7 +65,7 @@ MaomaoEarth（猫猫地球）是一个**本地优先**的三维地球应用，�
 ### 方式 A：下载 Release（推荐，普通用户）
 
 1. 打开仓库的 **Releases** 页面，下载：
-   - `maomaoearth-v0.5.0.zip`（代码/程序，含 `MaoMaoEarth.exe`）
+   - `maomaoearth-v0.5.1.zip`（代码/程序，含 `MaoMaoEarth.exe`）
    - `maomaoearth-data-<日期>.zip`（离线数据包，约 190 MB）
 2. 解压程序包到任意目录（路径尽量不含空格）。
 3. 把数据包解压到同一目录，得到 `data/public/...`（覆盖/合并 `data` 目录）。
@@ -315,6 +316,7 @@ local-earth/
 - [P1 验收](docs/P1-VERIFICATION.md)：光照、图层、诊断、绘制、剖面（77/77）
 - [P2 验收](docs/P2-VERIFICATION.md)：粒子方向回归、风廓线、搜索、快照、P0/P1 回归
 - [MBTiles 说明与验证](docs/MBTILES.md)：本地 SQLite 瓦片服务、TMS、4326、MVT 测试记录
+- [KML/KMZ 性能优化](docs/KML-PERF.md)：分片/快速解析、静态线 Primitive、前后对比数据
 - [MVT 解码/栅格化](docs/MVT.md)：pbf 瓦片支持范围与限制
 
 ---
@@ -327,6 +329,7 @@ local-earth/
 - **MBTiles**：栅格 png/jpg/webp 与 pbf/MVT 均已支持（MVT 为按瓦片 Canvas 栅格化，非 style.json 渲染）；EPSG:4326 支持。服务需通过 `MaoMaoEarth.exe mbtiles` 启动（后台），工程暂不保存 MBTiles 图层。
 - **仅本机可用**：MBTiles/地图服务只监听 `127.0.0.1`，分享链接只在本机有效，不提供公网访问。
 - **Wind3D**：仅 ESRI ASCII + WGS84/UTM；粒子为 CPU 更新、不含垂直速度；风廓线为单点。
+- **超大 KML 快速路径**：只对“扁平、无 Polygon/MultiGeometry/GroundOverlay、Style 在文档头”的简单 KML 启用；其它结构自动回退完整 DOM 分片解析。快速路径不解析 ExtendedData/description 弹窗字段。
 - **工程**：不内嵌本地 KML/KMZ/GeoTIFF；Wind3D 仅保存当前场景。
 - **快照**：HTML 为静态图片+信息，非交互地图；headless 浏览器下载可能被取消。
 - **KMZ 导出**：store 不压缩，不含时间动画。

@@ -1094,7 +1094,8 @@
   /** 地形高度（米）；未启用地形时为 0。 */
   function groundHeightAt(lon, lat) {
     if (!terrainEnabled()) return 0;
-    return window.LETerrain.heightAt(lon, lat);
+    const h = window.LETerrain.heightAt(lon, lat);
+    return isFinite(h) ? h : 0;
   }
 
   function heightFor(point, altitudeMode) {
@@ -1113,9 +1114,15 @@
   }
 
   function positionsFor(coords, altitudeMode) {
-    const positions = new Array(coords.length);
+    const positions = [];
     for (let i = 0; i < coords.length; i++) {
-      positions[i] = C.Cartesian3.fromDegrees(coords[i].lon, coords[i].lat, heightFor(coords[i], altitudeMode));
+      const h = heightFor(coords[i], altitudeMode);
+      const position = C.Cartesian3.fromDegrees(
+        coords[i].lon,
+        coords[i].lat,
+        isFinite(h) ? h : 0
+      );
+      if (position) positions.push(position);
     }
     return positions;
   }
@@ -1203,8 +1210,9 @@
    */
   function planLargeKmlSplit(text) {
     if (text.length < DOM_SPLIT_MIN_BYTES) return null;
-    // 有样式表时跨分片引用可能失效，禁用分片（避免错误着色/图标）
-    if (text.indexOf('<Style') >= 0 || text.indexOf('<StyleMap') >= 0) return null;
+    // 扁平分片会把 Document 头部（含 Style/StyleMap）复制进每个分片，因此允许样式；
+    // 顶层 Folder 分片暂不处理跨片样式引用，在下面单独返回 null。
+    const hasStyles = text.indexOf('<Style') >= 0 || text.indexOf('<StyleMap') >= 0;
     const head = text.slice(0, 16384);
     const kmlMatch = /<kml\b[^>]*>/i.exec(head);
     if (!kmlMatch) return null;
@@ -1239,6 +1247,37 @@
         }
       }
     }
+    // 扁平大 KML（没有 Folder，13 万 Placemark 直接挂在 Document 下）：
+    // 按 Placemark 连续块切片，每片都带上 Document 头部（Style/StyleMap），
+    // 这样既有跨片样式，又能把单次 DOMParser 阻塞控制在几 MB。
+    if (folders.length === 0) {
+      const pmRe = /<Placemark\b/g;
+      const opens = [];
+      let pm;
+      while ((pm = pmRe.exec(text)) !== null) {
+        if (pm.index >= contentStart && pm.index < contentEnd) opens.push(pm.index);
+      }
+      if (opens.length < 100) return null;
+      const firstPm = opens[0];
+      const header = text.slice(contentStart, firstPm);
+      if (header.length > 1024 * 1024) return null;
+      const target = 4 * 1024 * 1024;
+      const parts = [];
+      let chunkStart = firstPm;
+      for (let i = 0; i < opens.length; i++) {
+        const close = text.indexOf('</Placemark>', opens[i]);
+        if (close < 0) return null;
+        const chunkEnd = close + 12;
+        const last = i === opens.length - 1;
+        if (last || chunkEnd - chunkStart >= target) {
+          parts.push({ kind: 'chunk', start: chunkStart, end: last ? contentEnd : chunkEnd });
+          if (!last) chunkStart = opens[i + 1];
+        }
+      }
+      if (parts.length < 2) return null;
+      return { kmlOpen, docOpen, header, flat: true, parts };
+    }
+    if (hasStyles) return null;
     if (depth !== 0 || folders.length < DOM_SPLIT_MIN_FOLDERS) return null;
     if (folders.some((folder) => folder.end < 0)) return null;
     for (let i = 1; i < folders.length; i++) {
@@ -1256,6 +1295,141 @@
     return { kmlOpen, docOpen, parts };
   }
 
+
+  function fastXmlText(value) {
+    return String(value == null ? '' : value)
+      .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')
+      .replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"').replace(/&apos;/g, "'")
+      .replace(/&amp;/g, '&')
+      .trim();
+  }
+
+  function fastTagText(source, tag) {
+    const re = new RegExp('<' + tag + '\\b[^>]*>([\\s\\S]*?)</' + tag + '>', 'i');
+    const m = re.exec(source);
+    return m ? fastXmlText(m[1]) : '';
+  }
+
+  function fastAltitudeMode(raw) {
+    const text = String(raw || '').toLowerCase();
+    if (text === 'absolute') return 'absolute';
+    if (text === 'relativetoground') return 'relativeToGround';
+    if (text === 'clamptoground' || text === '') return 'clampToGround';
+    return 'relativeToGround';
+  }
+
+  /**
+   * 扁平 Simple KML 快速解析：只处理“Document 下直接挂 Placemark、每块只有
+   * LineString/Point + TimeSpan + styleUrl + 简单 ExtendedData”的常见导出格式。
+   * 任何不支持的标签/内联 Style 都返回 null，由调用方回退完整 DOM 分片解析。
+   */
+  async function fastParseFlatKml(text, plan, ctx, state, progress) {
+    if (/<(Polygon|MultiGeometry|Model|GroundOverlay|NetworkLink|ScreenOverlay|gx:Track|MultiTrack)\b/i.test(text)) return null;
+    if (plan.header.indexOf('<Style') < 0) return null;
+    const wrapper = plan.kmlOpen + plan.docOpen + plan.header + (plan.docOpen ? '</Document>' : '') + '</kml>';
+    let header;
+    try { header = parseXml(wrapper).root; } catch (err) { return null; }
+    const styles = new Map();
+    const styleMaps = new Map();
+    const styleEls = header.getElementsByTagNameNS
+      ? header.getElementsByTagNameNS('*', 'Style')
+      : header.getElementsByTagName('Style');
+    for (let i = 0; i < styleEls.length; i++) {
+      const el = styleEls[i];
+      const id = el.getAttribute('id');
+      if (id) styles.set(id, parseStyleElement(el));
+    }
+    const mapEls = header.getElementsByTagNameNS
+      ? header.getElementsByTagNameNS('*', 'StyleMap')
+      : header.getElementsByTagName('StyleMap');
+    for (let i = 0; i < mapEls.length; i++) {
+      const el = mapEls[i];
+      const id = el.getAttribute('id');
+      if (!id) continue;
+      const map = { normal: null, highlight: null };
+      for (let j = 0; j < el.children.length; j++) {
+        const pair = el.children[j];
+        if (pair.localName !== 'Pair') continue;
+        const key = childText(pair, 'key') || 'normal';
+        const target = childText(pair, 'styleUrl');
+        if (target) map[key === 'highlight' ? 'highlight' : 'normal'] = target;
+      }
+      styleMaps.set(id, map);
+    }
+    if (!styles.size) return null;
+
+    const t0 = perfNow();
+    let cursor = 0;
+    let parsed = 0;
+    const totalBytes = text.length;
+    while (true) {
+      const start = text.indexOf('<Placemark', cursor);
+      if (start < 0) break;
+      const openEnd = text.indexOf('>', start);
+      const end = text.indexOf('</Placemark>', openEnd + 1);
+      if (openEnd < 0 || end < 0) return null;
+      const body = text.slice(openEnd + 1, end);
+      if (body.indexOf('<Style') >= 0) return null;
+      const name = fastTagText(body, 'name') || '(未命名地物)';
+      const visible = fastTagText(body, 'visibility') !== '0';
+      const styleUrl = fastTagText(body, 'styleUrl');
+      const timeSpan = fastTagText(body, 'TimeSpan');
+      let time = null;
+      if (timeSpan) {
+        let begin = parseIsoTime(fastTagText(timeSpan, 'begin'));
+        let endT = parseIsoTime(fastTagText(timeSpan, 'end'));
+        if (!isFinite(begin) && isFinite(endT)) begin = endT;
+        if (!isFinite(endT) && isFinite(begin)) endT = begin;
+        if (isFinite(begin)) time = { begin, end: endT < begin ? begin : endT, source: 'TimeSpan' };
+      } else {
+        const stamp = fastTagText(body, 'TimeStamp');
+        const when = parseIsoTime(stamp ? fastTagText(stamp, 'when') : '');
+        if (isFinite(when)) time = { begin: when, end: when, source: 'TimeStamp' };
+      }
+      const geometryMode = fastAltitudeMode(fastTagText(body, 'altitudeMode'));
+      const geometries = [];
+      const lineAt = body.indexOf('<LineString');
+      const pointAt = body.indexOf('<Point');
+      if (lineAt >= 0 && body.indexOf('<LineString', lineAt + 1) < 0) {
+        const coords = parseCoordinates(fastTagText(body.slice(lineAt), 'coordinates'), ctx);
+        if (coords.length >= 2) geometries.push({ type: 'line', coords, altitudeMode: geometryMode, extrude: false });
+      } else if (pointAt >= 0 && body.indexOf('<Point', pointAt + 1) < 0) {
+        const coords = parseCoordinates(fastTagText(body.slice(pointAt), 'coordinates'), ctx);
+        if (coords.length) geometries.push({ type: 'point', coords, altitudeMode: geometryMode });
+      } else {
+        return null;
+      }
+      const style = resolveStyleUrl(styleUrl, styles, styleMaps, 0);
+      state.placemarks.push({
+        name,
+        visible,
+        description: '',
+        time,
+        style,
+        extended: {},
+        folderPath: [],
+        geometries,
+      });
+      if (!geometries.length) ctx.count('skippedPlacemark');
+      state.seen++;
+      parsed++;
+      if (parsed % 6000 === 0) {
+        await yieldToMain();
+        perfStats.yieldCount++;
+        if (progress) progress.report('parse', 10 + Math.round((end / totalBytes) * 52), { placemarks: parsed, total: 0 });
+      }
+      cursor = end + 12;
+    }
+    if (!parsed) return null;
+    perfStats.styleScanMs = 0;
+    perfStats.walkMs = Math.round(perfNow() - t0);
+    perfStats.walkPureMs = perfStats.walkMs;
+    perfStats.walkYieldMs = 0;
+    perfStats.fastFlat = true;
+    return header;
+  }
+
   async function parseDocumentModelSplit(text, plan, ctx, progress, state) {
     const styles = new Map();
     const styleMaps = new Map();
@@ -1263,8 +1437,9 @@
     state.domMs = 0;
     state.domMaxMs = 0;
     const parsePart = async (content, asDocument) => {
+      const header = asDocument && plan.header ? plan.header : '';
       const wrapper = asDocument
-        ? plan.kmlOpen + plan.docOpen + content + (plan.docOpen ? '</Document>' : '') + '</kml>'
+        ? plan.kmlOpen + plan.docOpen + header + content + (plan.docOpen ? '</Document>' : '') + '</kml>'
         : plan.kmlOpen + content + '</kml>';
       const t0 = perfNow();
       const parsed = parseXml(wrapper);
@@ -1306,12 +1481,20 @@
     };
     let headerRoot = null;
     let folderPartCount = 0;
-    for (const part of plan.parts) {
+    let fastFlat = false;
+    if (plan.flat) {
+      const fast = await fastParseFlatKml(text, plan, ctx, state, progress);
+      if (fast) {
+        headerRoot = fast;
+        fastFlat = true;
+      }
+    }
+    if (!fastFlat) for (const part of plan.parts) {
       if (part.kind === 'document' && part.end - part.start < 4096 && !text.slice(part.start, part.end).trim()) {
         reportChunk();
         continue;
       }
-      const asDocument = part.kind === 'document';
+      const asDocument = part.kind === 'document' || part.kind === 'chunk';
       if (!asDocument) folderPartCount++;
       const root = await parsePart(text.slice(part.start, part.end), asDocument);
       await yieldToMain();
@@ -1352,6 +1535,7 @@
       domMaxMs: Math.round(state.domMaxMs || 0),
       walkPureMs: Math.round(state.pureMs),
       walkYieldMs: Math.round(state.yieldMs),
+      fastFlat: fastFlat,
     });
     return model;
   }
@@ -2605,6 +2789,127 @@
     return api;
   }
 
+
+  /**
+   * 超大“线”动画播放器：每条 LineString 用 Csysium.PolylineCollection 渲染（比 3 万 Entity 轻得多）。
+   * 每帧一个 PolylineCollection，按需构建并缓存少量帧；切帧只把 collection 换入/换出 scene。
+   */
+  function createLineFrameAnimation(le, frames, frameGroups) {
+    const cache = new Map();
+    const cacheLimit = Math.max(1, Number(config.pointCloudCacheFrames) || 3);
+    const materialCache = new Map();
+    let active = null;
+    let current = -1;
+    let visible = true;
+
+    function buildFrame(index) {
+      const instances = [];
+      const group = frameGroups[index] || [];
+      for (const placemark of group) {
+        if (!placemark.visible) continue;
+        const lineStyle = placemark.style && placemark.style.line;
+        const color = ((lineStyle && lineStyle.color) || C.Color.WHITE).withAlpha(0.95);
+        const widthValue = Math.max(0.8, lineWidthOf(placemark.style));
+        for (const geometry of placemark.geometries) {
+          if (geometry.type !== 'line' || !geometry.coords || geometry.coords.length < 2) continue;
+          const clampToGround = geometry.altitudeMode === 'clampToGround' && !config.clampToGroundAsHeight;
+          const altitudeMode = geometry.altitudeMode === 'clampToGround' && config.clampToGroundAsHeight
+            ? 'relativeToGround'
+            : geometry.altitudeMode;
+          const positions = positionsFor(geometry.coords, altitudeMode);
+          if (positions.length < 2) continue;
+          const colors = new Array(positions.length);
+          for (let k = 0; k < colors.length; k++) colors[k] = color;
+          instances.push(new C.GeometryInstance({
+            geometry: new C.PolylineGeometry({
+              positions: positions,
+              width: widthValue,
+              colors: colors,
+              vertexFormat: C.PolylineColorAppearance.VERTEX_FORMAT,
+            }),
+          }));
+        }
+      }
+      if (!instances.length) return null;
+      return new C.Primitive({
+        geometryInstances: instances,
+        appearance: new C.PolylineColorAppearance({ translucent: true }),
+        asynchronous: false,
+        releaseGeometryInstances: false,
+      });
+    }
+
+    function prune() {
+      while (cache.size > cacheLimit) {
+        const oldest = cache.keys().next().value;
+        if (oldest === current) break;
+        const old = cache.get(oldest);
+        cache.delete(oldest);
+        try { le.viewer.scene.primitives.remove(old); } catch (err) { /* ignore */ }
+      }
+    }
+
+    function applyFrame(index) {
+      const t0 = perfNow();
+      if (active) {
+        try { active.show = false; } catch (err) { /* ignore */ }
+      }
+      if (!cache.has(index)) cache.set(index, buildFrame(index));
+      active = cache.get(index);
+      current = index;
+      if (active) {
+        try {
+          if (!active.__leAttached) {
+            le.viewer.scene.primitives.add(active);
+            active.__leAttached = true;
+          }
+          active.show = visible;
+        } catch (err) { /* ignore */ }
+      }
+      prune();
+      const ms = perfNow() - t0;
+      perfStats.frameSwitchCount++;
+      perfStats.lastFrameSwitchMs = Math.round(ms * 10) / 10;
+      if (ms > perfStats.maxFrameSwitchMs) perfStats.maxFrameSwitchMs = Math.round(ms * 10) / 10;
+      perfLog('frame-lines', {
+        frame: index,
+        ms: Math.round(ms * 10) / 10,
+        sourceLines: (frameGroups[index] || []).length,
+        cached: cache.size,
+      });
+    }
+
+    function setVisible(on) {
+      visible = !!on;
+      if (!active) return;
+      try { active.show = visible; } catch (err) { /* ignore */ }
+    }
+
+    function dispose() {
+      for (const collection of cache.values()) {
+        try { le.viewer.scene.primitives.remove(collection); } catch (err) { /* ignore */ }
+      }
+      cache.clear();
+      materialCache.clear();
+      active = null;
+    }
+
+    return {
+      applyFrame,
+      applyQuality: function () {},
+      setVisible,
+      dispose,
+      get count() { return active ? active.length : 0; },
+      get sourceCount() {
+        const found = frameGroups[current] || [];
+        let n = 0;
+        for (const pm of found) n += pm.geometries.length;
+        return n;
+      },
+      get currentFrame() { return current; },
+    };
+  }
+
   function createTimelineController(displayName, frames, applyFrame) {
     let current = 0;
     let disposed = false;
@@ -2850,6 +3155,8 @@
     const bounds = { west: Infinity, east: -Infinity, south: Infinity, north: -Infinity, has: false };
     const frames = model.frames || [];
     const animated = frames.length >= 2;
+    perfStats.frames = frames.length;
+    perfStats.animated = animated;
 
     // 4.1 预解析图标：KMZ 内图标优先；外部 http(s) 图标绝不联网，回退内置箭头 sprite
     let iconPlan = null;
@@ -2873,9 +3180,10 @@
     progress.report('build', 82);
     let frameGroups = null;
     let windowMode = false;
+    let animatedGeometries = 0;
     if (animated) {
       frameGroups = frames.map(() => []);
-      let animatedGeometries = 0;
+      animatedGeometries = 0;
       for (const placemark of model.placemarks) {
         if (!placemark.visible || placemark.frameIndex < 0) continue;
         frameGroups[placemark.frameIndex].push(placemark);
@@ -2913,6 +3221,39 @@
       if (primitiveMode) windowMode = false;
     }
 
+    // 超大动画若全是 LineString：改用 PolylineCollection 帧播放器（避免数万 Entity）。
+    let primitiveLineMode = false;
+    if (windowMode) {
+      primitiveLineMode = true;
+      let checked = 0;
+      for (const placemark of model.placemarks) {
+        if (!placemark.visible) continue;
+        for (const geometry of placemark.geometries) {
+          if (geometry.type !== 'line') { primitiveLineMode = false; break; }
+        }
+        if (!primitiveLineMode) break;
+        checked++;
+        if (checked % 20000 === 0) {
+          await yieldToMain();
+          perfStats.yieldCount++;
+        }
+      }
+      if (primitiveLineMode) windowMode = false;
+    }
+    perfStats.frameIndexed = frameGroups ? frameGroups.reduce(function (n, g) { return n + g.length; }, 0) : 0;
+    perfStats.windowMode = windowMode;
+    perfStats.primitiveLineMode = primitiveLineMode;
+    perfStats.primitiveMode = primitiveMode;
+    perfLog('anim-probe', {
+      frames: frames.length,
+      animated: animated,
+      frameIndexed: frameGroups ? frameGroups.reduce(function (n, g) { return n + g.length; }, 0) : 0,
+      animatedGeometries: animatedGeometries,
+      windowMode: windowMode,
+      primitiveMode: primitiveMode,
+      primitiveLineMode: primitiveLineMode,
+    });
+
     let primitives = null;
     const tBuild = perfNow();
     if (primitiveMode) {
@@ -2924,6 +3265,19 @@
         primitiveMode = false;
         windowMode = true;
         ctx.warn('点云动画初始化失败，已回退实体窗口模式：' + (err && err.message ? err.message : err));
+      }
+    }
+
+    let linePrimitives = null;
+    if (primitiveLineMode) {
+      try {
+        linePrimitives = createLineFrameAnimation(le, frames, frameGroups);
+        progress.report('build', 86);
+      } catch (err) {
+        linePrimitives = null;
+        primitiveLineMode = false;
+        windowMode = true;
+        ctx.warn('线动画初始化失败，已回退实体窗口模式：' + (err && err.message ? err.message : err));
       }
     }
 
@@ -2958,7 +3312,7 @@
 
     // 非窗口/非点云模式：一次性构建全部（切帧只改 entity.show，不重建数据源）
     // 构建过程同样分片让出主线程，避免大量 entity/billboard 一次性创建造成长冻结。
-    if (!windowMode && !primitiveMode) {
+    if (!windowMode && !primitiveMode && !primitiveLineMode) {
       const totalPlacemarks = Math.max(1, model.placemarks.length);
       let processed = 0;
       for (const placemark of model.placemarks) {
@@ -2977,7 +3331,11 @@
     // 4.3 时间过滤：仅显示当前帧（初始第一帧）
     let frameControls = null;
     if (animated) {
-      if (primitiveMode && primitives) {
+      if (primitiveLineMode && linePrimitives) {
+        frameControls = function applyFrameLines(index) {
+          linePrimitives.applyFrame(index);
+        };
+      } else if (primitiveMode && primitives) {
         frameControls = function applyFramePrimitives(index) {
           primitives.applyFrame(index);
         };
@@ -3031,7 +3389,7 @@
     await yieldToMain();
     perfStats.yieldCount++;
 
-    const renderedCount = windowMode || primitiveMode ? totalGeometries : entityCount;
+    const renderedCount = windowMode || primitiveMode || primitiveLineMode ? totalGeometries : entityCount;
 
     // 动画/点云模式的实体可能只覆盖当前帧窗口：用完整模型坐标补全定位范围，
     // 保证初始视角能框住全部时间帧（primitiveMode 甚至不创建 Entity）。
@@ -3115,6 +3473,7 @@
         animated,
         timelineWindow: windowMode,
         primitiveAnimation: primitiveMode,
+        primitiveLineAnimation: primitiveLineMode,
         pointSubsample: qualityState.pointSubsample,
         sourcePoints: perfStats.sourcePoints,
         renderedPoints: perfStats.renderedPoints,
@@ -3149,6 +3508,7 @@
         if (timeline) timeline.dispose();
         if (iconPlan) iconPlan.dispose();
         if (primitives) primitives.dispose();
+      if (linePrimitives) linePrimitives.dispose();
       },
     });
 
