@@ -2,7 +2,7 @@
 
 > 完全离线、双击即用的 Windows 三维地理信息工具：本地地形、卫星影像、KML/KMZ、WindNinja/Wind3D 风场直读、粒子/风廓线、工程保存与离线出图。
 >
-> **v0.4.0** · Windows 10/11 · 无需安装、无需联网、无需构建
+> **v0.5.0** · Windows 10/11 · 无需安装、无需联网、无需构建
 
 ![Wind3D 风场与三维地形](docs/screenshots/01-wind3d-terrain.png)
 
@@ -25,7 +25,7 @@ MaomaoEarth（猫猫地球）是一个**本地优先**的三维地球应用，�
 
 - **三维地形**：全球 0.1° 底图 + 东亚 0.02° + 风场区 1″ 高精度网格；地形夸张、3D/2D 切换、地形阴影。
 - **离线影像**：NASA Blue Marble 全球底图；Sentinel-2 cloudless 东亚 z5–z8、宽域 z9–z12、风场区 z13–z14；支持本地 XYZ 目录与 GeoTIFF。
-- **MBTiles 直读**：`MaoMaoEarth.exe mbtiles 文件.mbtiles` 启动本地瓦片服务，按 z/x/y 查 SQLite（winsqlite3，不整库载入），支持 png/jpg/webp、TMS/XYZ、图层透明度/排序。
+- **MBTiles 直读**：`MaoMaoEarth.exe mbtiles 文件.mbtiles` 后台启动本地瓦片服务（无命令行窗口），按 z/x/y 查 SQLite（winsqlite3，不整库载入）；支持 png/jpg/webp 栅格、**pbf/MVT 矢量瓦片**、**EPSG:3857 / EPSG:4326**、TMS/XYZ、图层透明度/排序。
 - **矢量数据**：Natural Earth 详细国界/河流/湖泊/城市；国界/河流按地形高度贴地绘制，城市点按距离显隐。
 - **Wind3D / WindNinja 直读**：读取 `*_vel.asc` + `*_ang.asc` + `.prj`，自动 UTM→WGS84，彩色贴地箭头、风速图例、多时间/高度场景切换。
 - **风场粒子**：600/1200/2200 粒子三档，双线性插值风向/风速，尾迹沿风向；与箭头/两者模式切换。
@@ -52,9 +52,10 @@ MaomaoEarth（猫猫地球）是一个**本地优先**的三维地球应用，�
 |---|---|
 | ![光照](docs/screenshots/07-lighting.png) | ![搜索](docs/screenshots/06-search.png) |
 
-| MBTiles 直读 | |
+| MBTiles 直读 | MVT 矢量瓦片 |
 |---|---|
-| ![MBTiles](docs/screenshots/08-mbtiles.png) | 本地 SQLite 瓦片服务 + ImageryProvider |
+| ![MBTiles](docs/screenshots/08-mbtiles.png) | ![MVT](docs/screenshots/09-mvt.png) |
+| 本地 SQLite 瓦片服务 + ImageryProvider | 纯 JS MVT 解码 + Canvas 栅格化 |
 
 ---
 
@@ -63,7 +64,7 @@ MaomaoEarth（猫猫地球）是一个**本地优先**的三维地球应用，�
 ### 方式 A：下载 Release（推荐，普通用户）
 
 1. 打开仓库的 **Releases** 页面，下载：
-   - `maomaoearth-v0.4.0.zip`（代码/程序，含 `MaoMaoEarth.exe`）
+   - `maomaoearth-v0.5.0.zip`（代码/程序，含 `MaoMaoEarth.exe`）
    - `maomaoearth-data-<日期>.zip`（离线数据包，约 190 MB）
 2. 解压程序包到任意目录（路径尽量不含空格）。
 3. 把数据包解压到同一目录，得到 `data/public/...`（覆盖/合并 `data` 目录）。
@@ -71,7 +72,7 @@ MaomaoEarth（猫猫地球）是一个**本地优先**的三维地球应用，�
 
 > 仓库源码出于体积原因**不包含**大型栅格/影像瓦片（见“数据包说明”）。没有数据包时程序仍可启动，但地形/卫星影像/底图瓦片会缺失。
 >
-> MBTiles 使用：`MaoMaoEarth.exe mbtiles "D:\data\china.mbtiles"`，详见 [docs/MBTILES.md](docs/MBTILES.md)。
+> MBTiles 使用：`MaoMaoEarth.exe mbtiles "D:\data\china.mbtiles"`（后台服务，无窗口；`MaoMaoEarth.exe stop` 停止），详见 [docs/MBTILES.md](docs/MBTILES.md)。
 
 ### 方式 B：从源码 + 数据包
 
@@ -180,7 +181,7 @@ http://127.0.0.1:8123/?windninja=..._vel.asc&windmode=particles&particles=2200&e
 | Wind3D 直读 | ASC/PRJ/UTM，箭头/图例/场景切换 |
 | 工程 | `.leproj` 保存/恢复相机、地形、图层、Wind3D |
 | 导出 | PNG、PDF、GeoJSON、KMZ |
-| MBTiles | 本地 SQLite 瓦片直读（png/jpg/webp，TMS/XYZ） |
+| MBTiles | 本地 SQLite 瓦片直读（png/jpg/webp/pbf，3857/4326，TMS/XYZ） |
 | 打包/CLI/API | `MaoMaoEarth.exe`、`maomaoearth.cmd`、`MaoMaoEarth` JS API |
 
 ### P1：交互与分析
@@ -254,7 +255,8 @@ local-earth/
   start.cmd / serve.ps1      # 浏览器版启动
   index.html                 # 单页应用
   js/
-    mbtiles.js               # MBTiles 本地瓦片服务客户端（v0.4.0）
+    mvt.js                   # MVT 解码 + Canvas 栅格化（v0.5.0）
+    mbtiles.js               # MBTiles 本地瓦片服务客户端（v0.5.0）
     main.js                  # 启动、Cesium Viewer、LE API
     terrain.js               # 地形/影像/高度查询
     kml-native.js            # KML/KMZ 原生渲染
@@ -312,7 +314,8 @@ local-earth/
 - [P0 验收](docs/P0-VERIFICATION.md)：EXE/CLI、Wind3D、工程、导出
 - [P1 验收](docs/P1-VERIFICATION.md)：光照、图层、诊断、绘制、剖面（77/77）
 - [P2 验收](docs/P2-VERIFICATION.md)：粒子方向回归、风廓线、搜索、快照、P0/P1 回归
-- [MBTiles 说明与验证](docs/MBTILES.md)：本地 SQLite 瓦片服务、TMS、测试记录
+- [MBTiles 说明与验证](docs/MBTILES.md)：本地 SQLite 瓦片服务、TMS、4326、MVT 测试记录
+- [MVT 解码/栅格化](docs/MVT.md)：pbf 瓦片支持范围与限制
 
 ---
 
@@ -321,7 +324,8 @@ local-earth/
 - **地形光照**：高度网格无顶点法线，Cesium 只做昼夜明暗，没有地形起伏自阴影；可用“阴影增强”突出预烘焙 hillshade。
 - **影像范围**：Sentinel-2 仅覆盖东亚/风场区，其他区域为 Blue Marble；高精度影像需按脚本自行扩展。
 - **地形精度**：0.1°/0.02°/1″ 为再采样产品，非测绘精度。
-- **MBTiles**：支持 WebMercator 栅格 png/jpg/webp；pbf 矢量瓦片与 EPSG:4326 瓦片未支持；需通过 `MaoMaoEarth.exe mbtiles` 启动瓦片服务，工程暂不保存。
+- **MBTiles**：栅格 png/jpg/webp 与 pbf/MVT 均已支持（MVT 为按瓦片 Canvas 栅格化，非 style.json 渲染）；EPSG:4326 支持。服务需通过 `MaoMaoEarth.exe mbtiles` 启动（后台），工程暂不保存 MBTiles 图层。
+- **仅本机可用**：MBTiles/地图服务只监听 `127.0.0.1`，分享链接只在本机有效，不提供公网访问。
 - **Wind3D**：仅 ESRI ASCII + WGS84/UTM；粒子为 CPU 更新、不含垂直速度；风廓线为单点。
 - **工程**：不内嵌本地 KML/KMZ/GeoTIFF；Wind3D 仅保存当前场景。
 - **快照**：HTML 为静态图片+信息，非交互地图；headless 浏览器下载可能被取消。

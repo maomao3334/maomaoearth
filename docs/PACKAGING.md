@@ -2,7 +2,7 @@
 
 ## 产物
 
-- `MaoMaoEarth.exe`：Windows 免安装启动器（.NET Framework 4.x，使用系统自带 `csc.exe` 编译，约 25 KB）
+- `MaoMaoEarth.exe`：Windows 免安装启动器（.NET Framework 4.x，使用系统自带 `csc.exe` 编译，约 30 KB）
 - 运行目录：`index.html`、`serve.ps1`、`js/`、`css/`、`data/`、`vendor/` 与 `MaoMaoEarth.exe` 同级
 - CLI 包装：`maomaoearth.cmd`
 - 浏览器版：`start.cmd` / `serve.ps1`（与打包版共用同一套前端与 API）

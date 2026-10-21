@@ -29,3 +29,6 @@ data/public/imagery/blue-marble-21600.jpg
 data/public/tiles/
 docs/testdata/
 release/
+
+.maomaoearth-mbtiles.state
+.maomaoearth-mbtiles.state.tok

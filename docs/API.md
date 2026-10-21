@@ -172,7 +172,7 @@ MaoMaoEarth.snapshot.copyShare();
 ```
 
 
-## MBTiles（v0.4.0）
+## MBTiles（v0.5.0）
 
 ```js
 // 先运行 MaoMaoEarth.exe mbtiles <file>，从终端复制服务地址与 token
@@ -181,5 +181,5 @@ MaoMaoEarth.mbtiles.getState();
 MaoMaoEarth.mbtiles.clear();
 ```
 
-底层对象：`LEMBTiles`（`load/clear/getState/openDialog`）。
-详见 [MBTILES.md](MBTILES.md)。
+底层对象：`LEMBTiles`（`load/clear/getState/openDialog`）；矢量 pbf 走 `LEMvt.createImageryProvider`。
+支持 png/jpg/webp 栅格、pbf/MVT 矢量、EPSG:3857/4326；详见 [MBTILES.md](MBTILES.md)、[MVT.md](MVT.md)。

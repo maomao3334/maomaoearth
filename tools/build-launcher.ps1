@@ -9,6 +9,6 @@ if (-not (Test-Path $csc)) {
 if (-not (Test-Path $csc)) { throw '找不到 csc.exe（需要 .NET Framework 4.x）' }
 $src = Join-Path $root 'packaging\MaoMaoEarthLauncher.cs'
 $out = Join-Path $root 'MaoMaoEarth.exe'
-& $csc /nologo /target:exe /out:$out /platform:anycpu $src
+& $csc /nologo /target:exe /out:$out /platform:anycpu /r:"C:\Windows\Microsoft.NET\Framework64\v4.0.30319\System.Management.dll" $src
 if (-not (Test-Path $out)) { throw '编译失败' }
 Write-Host ("已生成 " + $out + " (" + (Get-Item $out).Length + " B)") -ForegroundColor Green

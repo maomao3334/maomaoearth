@@ -20,7 +20,7 @@ using System.Threading;
 //   MaoMaoEarth.exe mbtiles <file> 启动本地 MBTiles 瓦片服务并打开应用
 class MaoMaoEarthLauncher
 {
-    const string Version = "0.4.0";
+    const string Version = "0.5.0";
     static string appDir;
     static string pidPath;
     static string logPath;
@@ -35,6 +35,7 @@ class MaoMaoEarthLauncher
         int port = 8123;
         bool noBrowser = false;
         string windDir = null;
+        string extraArg = null;
         for (int i = 0; i < args.Length; i++)
         {
             string a = args[i] ?? "";
@@ -45,6 +46,7 @@ class MaoMaoEarthLauncher
             if (a.StartsWith("-")) continue;
             if (command == "") command = a;
             else if (windDir == null) windDir = a;
+            else if (extraArg == null) extraArg = a;
         }
         if (command == "") command = "open";
         if (command == "help" || command == "--help" || command == "-h") { PrintHelp(); return 0; }
@@ -65,6 +67,8 @@ class MaoMaoEarthLauncher
                 case "mbtiles":
                     if (string.IsNullOrEmpty(windDir)) { Console.Error.WriteLine("mbtiles 需要 .mbtiles 文件参数"); return 2; }
                     return OpenMbtiles(windDir, port, noBrowser);
+                case "__mbtiles-server":
+                    return RunMbtilesChild(windDir, extraArg);
                 case "open":
                     return Serve(port, noBrowser, false);
                 default:
@@ -91,8 +95,9 @@ class MaoMaoEarthLauncher
         Console.WriteLine("  MaoMaoEarth.exe check                 打印环境与服务状态");
         Console.WriteLine("  MaoMaoEarth.exe stop                  停止本启动器启动的服务");
         Console.WriteLine("  MaoMaoEarth.exe windninja <目录>      启动并打开 WindNinja 结果目录");
-        Console.WriteLine("  MaoMaoEarth.exe mbtiles <文件>        启动 MBTiles 瓦片服务并打开应用");
+        Console.WriteLine("  MaoMaoEarth.exe mbtiles <文件>        后台启动 MBTiles 瓦片服务并打开应用");
         Console.WriteLine("    --port 8123 --no-browser             可选：静态服务端口 / 不自动打开浏览器");
+        Console.WriteLine("  MaoMaoEarth.exe stop                  停止静态服务与后台 MBTiles 服务");
         Console.WriteLine("  MaoMaoEarth.exe --help");
         Console.WriteLine();
         Console.WriteLine("说明：服务仅监听 127.0.0.1，浏览器以 --app 窗口模式打开；数据全部本地读取。");
@@ -286,7 +291,8 @@ class MaoMaoEarthLauncher
 
     static int StopServer()
     {
-        if (!File.Exists(pidPath)) { Console.WriteLine("没有记录的服务 PID（可能未由本启动器启动）"); return 0; }
+        StopMbtilesService(true);
+        if (!File.Exists(pidPath)) { Console.WriteLine("没有记录的静态服务 PID（可能未由本启动器启动）"); return 0; }
         int pid;
         if (!int.TryParse(File.ReadAllText(pidPath).Trim(), out pid)) { Console.WriteLine("PID 文件无效"); return 1; }
         try
@@ -307,6 +313,150 @@ class MaoMaoEarthLauncher
     }
 
 
+    static string MbtilesStatePath
+    {
+        get { return Path.Combine(appDir, ".maomaoearth-mbtiles.state"); }
+    }
+
+    static Dictionary<string, string> ReadState(string path)
+    {
+        Dictionary<string, string> d = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        if (!File.Exists(path)) return d;
+        try
+        {
+            foreach (string line in File.ReadAllLines(path))
+            {
+                int i = line.IndexOf('=');
+                if (i > 0) d[line.Substring(0, i).Trim()] = line.Substring(i + 1).Trim();
+            }
+        }
+        catch { }
+        return d;
+    }
+
+    static bool MbtilesHealth(int port, string token)
+    {
+        try
+        {
+            HttpWebRequest req = (HttpWebRequest)WebRequest.Create("http://127.0.0.1:" + port + "/health?token=" + Uri.EscapeDataString(token));
+            req.Method = "GET"; req.Timeout = 1200; req.Proxy = null;
+            using (HttpWebResponse res = (HttpWebResponse)req.GetResponse()) return (int)res.StatusCode == 200;
+        }
+        catch { return false; }
+    }
+
+    static void StopMbtilesService(bool verbose)
+    {
+        string path = MbtilesStatePath;
+        if (!File.Exists(path)) return;
+        Dictionary<string, string> st = ReadState(path);
+        int pid;
+        string pidText;
+        if (st.TryGetValue("pid", out pidText) && int.TryParse(pidText, out pid))
+        {
+            try
+            {
+                Process p = Process.GetProcessById(pid);
+                p.Kill(); p.WaitForExit(2000);
+                if (verbose) Console.WriteLine("已停止后台 MBTiles 服务 PID " + pid);
+            }
+            catch { }
+        }
+        try { File.Delete(path); } catch { }
+    }
+
+    static int RunMbtilesChild(string file, string statePath)
+    {
+        if (string.IsNullOrEmpty(file) || string.IsNullOrEmpty(statePath))
+        {
+            Console.Error.WriteLine("__mbtiles-server 参数不完整");
+            return 2;
+        }
+        string token = Environment.GetEnvironmentVariable("MAOMAO_MBTILES_TOKEN");
+        string tokenFile = statePath + ".tok";
+        if (File.Exists(tokenFile))
+        {
+            try { token = File.ReadAllText(tokenFile).Trim(); File.Delete(tokenFile); } catch { }
+        }
+        try
+        {
+            MbtilesServer server = new MbtilesServer(file, token);
+            server.Start();
+            StringBuilder sb = new StringBuilder();
+            sb.AppendLine("pid=" + Process.GetCurrentProcess().Id);
+            sb.AppendLine("port=" + server.Port);
+            sb.AppendLine("token=" + server.Token);
+            sb.AppendLine("file=" + file);
+            File.WriteAllText(statePath, sb.ToString(), new UTF8Encoding(false));
+            while (true) Thread.Sleep(1000);
+        }
+        catch (Exception ex)
+        {
+            try { File.WriteAllText(statePath, "error=" + ex.Message + Environment.NewLine, new UTF8Encoding(false)); } catch { }
+            Console.Error.WriteLine(ex.Message);
+            return 1;
+        }
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    struct STARTUPINFO
+    {
+        public int cb;
+        public string lpReserved;
+        public string lpDesktop;
+        public string lpTitle;
+        public int dwX, dwY, dwXSize, dwYSize, dwXCountChars, dwYCountChars, dwFillAttribute, dwFlags;
+        public short wShowWindow, cbReserved2;
+        public IntPtr lpReserved2;
+        public IntPtr hStdInput, hStdOutput, hStdError;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    struct PROCESS_INFORMATION
+    {
+        public IntPtr hProcess, hThread;
+        public int dwProcessId, dwThreadId;
+    }
+
+    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    static extern bool CreateProcess(string lpApplicationName, StringBuilder lpCommandLine,
+        IntPtr lpProcessAttributes, IntPtr lpThreadAttributes, bool bInheritHandles,
+        uint dwCreationFlags, IntPtr lpEnvironment, string lpCurrentDirectory,
+        ref STARTUPINFO si, out PROCESS_INFORMATION pi);
+    [DllImport("kernel32.dll", SetLastError = true)]
+    static extern IntPtr CreateFile(string name, uint access, uint share, IntPtr security,
+        uint disposition, uint flags, IntPtr template);
+    [DllImport("kernel32.dll", SetLastError = true)]
+    static extern bool CloseHandle(IntPtr handle);
+
+    static int StartDetachedProcess(string arguments)
+    {
+        IntPtr nul = CreateFile("NUL", 0xC0000000, 0x00000003, IntPtr.Zero, 3, 0, IntPtr.Zero);
+        STARTUPINFO si = new STARTUPINFO();
+        si.cb = Marshal.SizeOf(typeof(STARTUPINFO));
+        si.dwFlags = 0x00000100;
+        si.hStdInput = nul;
+        si.hStdOutput = nul;
+        si.hStdError = nul;
+        PROCESS_INFORMATION pi;
+        StringBuilder cmd = new StringBuilder("\"" + Process.GetCurrentProcess().MainModule.FileName + "\" " + arguments);
+        uint flags = 0x00000008 | 0x08000000 | 0x00000200 | 0x01000000;
+        bool ok = CreateProcess(Process.GetCurrentProcess().MainModule.FileName, cmd,
+            IntPtr.Zero, IntPtr.Zero, true, flags, IntPtr.Zero, appDir, ref si, out pi);
+        if (!ok)
+        {
+            flags = 0x00000008 | 0x08000000 | 0x00000200;
+            ok = CreateProcess(Process.GetCurrentProcess().MainModule.FileName, cmd,
+                IntPtr.Zero, IntPtr.Zero, true, flags, IntPtr.Zero, appDir, ref si, out pi);
+        }
+        if (nul != IntPtr.Zero) CloseHandle(nul);
+        if (!ok) throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
+        int pid = pi.dwProcessId;
+        if (pi.hProcess != IntPtr.Zero) CloseHandle(pi.hProcess);
+        if (pi.hThread != IntPtr.Zero) CloseHandle(pi.hThread);
+        return pid;
+    }
+
     static int OpenMbtiles(string file, int port, bool noBrowser)
     {
         if (!File.Exists(file)) { Console.Error.WriteLine("MBTiles 文件不存在：" + file); return 1; }
@@ -320,35 +470,53 @@ class MaoMaoEarthLauncher
             }
         }
         catch (Exception ex) { Console.Error.WriteLine("读取 MBTiles 失败：" + ex.Message); return 1; }
-        string magic = Encoding.ASCII.GetString(head);
-        if (!magic.StartsWith("SQLite format 3"))
+        if (!Encoding.ASCII.GetString(head).StartsWith("SQLite format 3"))
         {
             Console.Error.WriteLine("不是 SQLite/MBTiles 文件（缺少 SQLite 文件头）");
             return 1;
         }
         int rc = EnsureServer(ref port);
         if (rc != 0) return rc;
-        MbtilesServer server = null;
+        StopMbtilesService(false);
+        string statePath = MbtilesStatePath;
+        string token = Guid.NewGuid().ToString("N");
+        try { File.WriteAllText(statePath + ".tok", token, new UTF8Encoding(false)); } catch { }
         try
         {
-            server = new MbtilesServer(full);
-            server.Start();
+            StartDetachedProcess("__mbtiles-server \"" + full + "\" \"" + statePath + "\"");
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine("MBTiles 服务启动失败：" + ex.Message);
+            Console.Error.WriteLine("后台 MBTiles 服务启动失败：" + ex.Message);
             return 1;
         }
-        string appUrl = "http://127.0.0.1:" + port + "/?mbtiles=" + Uri.EscapeDataString(server.BaseUrl) + "&mbtoken=" + Uri.EscapeDataString(server.Token);
-        Console.WriteLine("MBTiles 已挂载：" + full);
-        Console.WriteLine("MBTILES_SERVER=" + server.BaseUrl);
-        Console.WriteLine("MBTILES_TOKEN=" + server.Token);
-        Console.WriteLine("MBTILES_META=" + server.BaseUrl + "/meta.json?token=" + server.Token);
+        Dictionary<string, string> st = null;
+        string statePid = null, stateToken = null;
+        int mport = 0;
+        for (int i = 0; i < 150; i++)
+        {
+            Thread.Sleep(100);
+            st = ReadState(statePath);
+            if (st.ContainsKey("error")) { Console.Error.WriteLine("MBTiles 服务错误：" + st["error"]); return 1; }
+            if (st.TryGetValue("port", out statePid) && int.TryParse(statePid, out mport)) { st.TryGetValue("token", out stateToken); break; }
+        }
+        if (mport <= 0 || string.IsNullOrEmpty(stateToken))
+        {
+            Console.Error.WriteLine("后台 MBTiles 服务未就绪，请查看 " + statePath);
+            return 1;
+        }
+        string baseUrl = "http://127.0.0.1:" + mport;
+        string appUrl = "http://127.0.0.1:" + port + "/?mbtiles=" + Uri.EscapeDataString(baseUrl) + "&mbtoken=" + Uri.EscapeDataString(stateToken);
+        Console.WriteLine("MBTiles 已在后台挂载：" + full);
+        Console.WriteLine("MBTILES_SERVER=" + baseUrl);
+        Console.WriteLine("MBTILES_TOKEN=" + stateToken);
+        Console.WriteLine("MBTILES_META=" + baseUrl + "/meta.json?token=" + stateToken);
         Console.WriteLine("MBTILES_APP=" + appUrl);
+        Console.WriteLine("MBTILES_PID=" + (st.ContainsKey("pid") ? st["pid"] : "?"));
         if (!noBrowser) OpenBrowserUrl(appUrl);
         else Console.WriteLine("打开：" + appUrl);
-        Console.WriteLine("按 Ctrl+C 停止 MBTiles 瓦片服务（静态服务保持运行）。");
-        while (true) Thread.Sleep(500);
+        Console.WriteLine("背景服务已启动；停止：MaoMaoEarth.exe stop（静态服务也会停止）。");
+        return 0;
     }
 
     /// <summary>本地 MBTiles(SQLite) 瓦片服务：只监听 127.0.0.1，token 校验，按 z/x/y 查询。</summary>
@@ -387,12 +555,13 @@ class MaoMaoEarthLauncher
         public int Port { get; private set; }
 
         readonly string dbPath;
+        readonly string forcedToken;
         readonly Dictionary<string, string> meta = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         HttpListener listener;
         Thread thread;
         volatile bool running;
 
-        public MbtilesServer(string path) { dbPath = path; }
+        public MbtilesServer(string path, string token) { dbPath = path; forcedToken = token; }
 
         public void Start()
         {
@@ -414,7 +583,7 @@ class MaoMaoEarthLauncher
                 }
             }
             Port = p;
-            Token = Guid.NewGuid().ToString("N");
+            Token = string.IsNullOrEmpty(forcedToken) ? Guid.NewGuid().ToString("N") : forcedToken;
             BaseUrl = "http://127.0.0.1:" + Port;
             MetaJson = BuildMetaJson();
             running = true;
@@ -487,7 +656,9 @@ class MaoMaoEarthLauncher
                     Respond(ctx, 204, null, null);
                     return;
                 }
-                Respond(ctx, 200, SniffContentType(data), data);
+                string fmt = MetaValue("format", "").ToLowerInvariant();
+                string ct = (fmt == "pbf" || fmt == "mvt") ? "application/x-protobuf" : SniffContentType(data);
+                Respond(ctx, 200, ct, data);
                 return;
             }
             Respond(ctx, 404, "text/plain; charset=utf-8", Encoding.UTF8.GetBytes("404"));
@@ -643,6 +814,7 @@ class MaoMaoEarthLauncher
             JsonField(sb, "name", MetaValue("name", Path.GetFileNameWithoutExtension(dbPath)), true);
             JsonField(sb, "format", format, false);
             JsonField(sb, "scheme", scheme, false);
+            JsonField(sb, "crs", MetaValue("crs", MetaValue("projection", "EPSG:3857")), false);
             JsonField(sb, "bounds", bounds, false);
             JsonNumber(sb, "minzoom", minzoom);
             JsonNumber(sb, "maxzoom", maxzoom);
