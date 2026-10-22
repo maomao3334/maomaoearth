@@ -72,6 +72,12 @@
         <button id="btn-imagery" class="wide">卫星影像（开）</button>
       </section>
 
+      <section class="side-section" id="local-imagery-section" hidden>
+        <h3>本地影像 <span id="local-imagery-count" class="count">0</span></h3>
+        <div id="local-imagery-list" class="local-imagery-list"></div>
+        <p class="side-note" id="local-imagery-note">仅本机使用：<code>data/local/</code> 下的影像不会进入 Git 或发布包。</p>
+      </section>
+
       <section class="side-section" id="lighting-section">
         <h3>实时光照 <span id="lighting-state" class="count">关</span></h3>
         <div class="row2">
@@ -409,6 +415,7 @@
   <script src="js/snapshot.js"></script>
   <script src="js/mvt.js"></script>
   <script src="js/mbtiles.js"></script>
+  <script src="js/local-imagery.js"></script>
   <script src="js/api.js"></script>
   <script src="js/main.js"></script>
 </body>

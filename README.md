@@ -2,7 +2,7 @@
 
 > 完全离线、双击即用的 Windows 三维地理信息工具：本地地形、卫星影像、KML/KMZ、WindNinja/Wind3D 风场直读、粒子/风廓线、工程保存与离线出图。
 >
-> **v0.7.0** · Windows 10/11 · 无需安装、无需联网、无需构建
+> **v0.8.0** · Windows 10/11 · 无需安装、无需联网、无需构建
 
 ![Wind3D 风场与三维地形](docs/screenshots/01-wind3d-terrain.png)
 
@@ -25,6 +25,7 @@ MaomaoEarth（猫猫地球）是一个**本地优先**的三维地球应用，�
 
 - **三维地形**：全球 0.1° 底图 + 东亚 0.02° + 风场区 1″ 高精度网格；地形夸张、3D/2D 切换、地形阴影。
 - **离线影像**：NASA Blue Marble 全球底图；Sentinel-2 cloudless 东亚 z5–z8、宽域 z9–z12、风场区 z13–z14；支持本地 XYZ 目录与 GeoTIFF。
+- **本地影像（仅本机）**：北京正射 ENVI 镶嵌可切成 z8–z15 离线 XYZ 瓦片，放在 `data/local/`（已 `.gitignore`，不进 Git / 发布包）；启动自动加载，侧栏「本地影像」卡片支持加载/移除/定位，本地影像保持在卫星影像之上（详见 docs/LOCAL_IMAGERY.md）。
 - **绘制增强**：点/线/面贴地 + 地形遮挡虚线；所有顶点显示“标记点 N”标签；实时长度/面积/光标坐标；吸附地形/顶点；绘制要素列表（改名/显隐/定位/删除）；KML/CSV 导出；线/面透明度与标签开关（详见 docs/DRAW.md）。
 - **坐标标点**：经纬度支持十进制度/度分秒切换、单行粘贴、地图选点；可自定义名称/备注/颜色，名称标签常显；支持标记点列表管理、拖拽、CSV/GeoJSON/KML 导出、CSV/GeoJSON 导入、工程保存（详见 docs/MARKERS.md）。
 - **底图显示修复**：低画质/无地形时国界 GeoJSON 面曾默认白色填充，盖住卫星底图；已显式改为只描边，并让缺失 S2 瓦片透明（详见 docs/MAP-DISPLAY-FIX.md）。
@@ -76,7 +77,7 @@ MaomaoEarth（猫猫地球）是一个**本地优先**的三维地球应用，�
 ### 方式 A：下载 Release（推荐，普通用户）
 
 1. 打开仓库的 **Releases** 页面，下载：
-   - `maomaoearth-v0.7.0.zip`（代码/程序，含 `MaoMaoEarth.exe`）
+   - `maomaoearth-v0.8.0.zip`（代码/程序，含 `MaoMaoEarth.exe`）
    - `maomaoearth-data-<日期>.zip`（离线数据包，约 190 MB）
 2. 解压程序包到任意目录（路径尽量不含空格）。
 3. 把数据包解压到同一目录，得到 `data/public/...`（覆盖/合并 `data` 目录）。
@@ -85,6 +86,8 @@ MaomaoEarth（猫猫地球）是一个**本地优先**的三维地球应用，�
 > 仓库源码出于体积原因**不包含**大型栅格/影像瓦片（见“数据包说明”）。没有数据包时程序仍可启动，但地形/卫星影像/底图瓦片会缺失。
 >
 > MBTiles 使用：`MaoMaoEarth.exe mbtiles "D:\data\china.mbtiles"`（后台服务，无窗口；`MaoMaoEarth.exe stop` 停止），详见 [docs/MBTILES.md](docs/MBTILES.md)。
+>
+> 北京正射等**本地影像**不在数据包内：在本机运行 `python tools\prepare_pek_ortho.py --src "C:\...\PEK"` 生成到 `data/local/`（仅本机，绝不进入 Git / 发布包），详见 [docs/LOCAL_IMAGERY.md](docs/LOCAL_IMAGERY.md)。
 
 ### 方式 B：从源码 + 数据包
 
@@ -129,6 +132,13 @@ data/public/dem/*.bin / *.png / *.hgt.gz     # 全球/东亚/1″ 地形与阴�
 data/public/imagery/s2cloudless/             # Sentinel-2 影像瓦片
 data/public/imagery/blue-marble-21600.jpg    # Blue Marble 原图
 data/public/tiles/                           # Blue Marble z0–z5 底图瓦片
+```
+
+**仅本机、不随数据包**（`.gitignore` 已排除）：
+
+```
+data/local/imagery.json                      # 本地影像清单（自动生成）
+data/local/beijing-ortho/tiles/              # 北京正射 z8–z15（约 2.75 万张 / 567 MB）
 ```
 
 解压数据包后目录结构：
@@ -332,6 +342,7 @@ local-earth/
 - [底图白块修复](docs/MAP-DISPLAY-FIX.md)：国界面填充、S2 缺失瓦片透明、低画质验证
 - [坐标标点](docs/MARKERS.md)：十进制度/度分秒、地图选点、列表/拖拽、导入导出
 - [绘制增强](docs/DRAW.md)：贴地线/面、顶点标签、实时量算、吸附、要素列表
+- [本地影像](docs/LOCAL_IMAGERY.md)：北京正射 ENVI → 离线 XYZ 瓦片、仅本机、不进 Git
 - [MVT 解码/栅格化](docs/MVT.md)：pbf 瓦片支持范围与限制
 
 ---
@@ -342,6 +353,7 @@ local-earth/
 - **影像范围**：Sentinel-2 仅覆盖东亚/风场区，其他区域为 Blue Marble；高精度影像需按脚本自行扩展。
 - **地形精度**：0.1°/0.02°/1″ 为再采样产品，非测绘精度。
 - **MBTiles**：栅格 png/jpg/webp 与 pbf/MVT 均已支持（MVT 为按瓦片 Canvas 栅格化，非 style.json 渲染）；EPSG:4326 支持。服务需通过 `MaoMaoEarth.exe mbtiles` 启动（后台），工程暂不保存 MBTiles 图层。
+- **本地影像**：`data/local/` 仅本机存在，需先用 `tools/prepare_pek_ortho.py` 从原始 ENVI 生成；不随 Release 分发，换机需重新生成。
 - **仅本机可用**：MBTiles/地图服务只监听 `127.0.0.1`，分享链接只在本机有效，不提供公网访问。
 - **Wind3D**：仅 ESRI ASCII + WGS84/UTM；粒子为 CPU 更新、不含垂直速度；风廓线为单点。
 - **超大 KML 快速路径**：只对“扁平、无 Polygon/MultiGeometry/GroundOverlay、Style 在文档头”的简单 KML 启用；其它结构自动回退完整 DOM 分片解析。快速路径不解析 ExtendedData/description 弹窗字段。

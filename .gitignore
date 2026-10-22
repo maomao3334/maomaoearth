@@ -30,5 +30,8 @@ data/public/tiles/
 docs/testdata/
 release/
 
+# 仅本机数据：北京正射等本地影像，绝不进入 Git / 发布包
+data/local/
+
 .maomaoearth-mbtiles.state
 .maomaoearth-mbtiles.state.tok

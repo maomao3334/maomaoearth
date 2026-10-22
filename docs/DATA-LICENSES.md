@@ -17,6 +17,7 @@ MaomaoEarth（猫猫地球）代码以 MIT 许可发布。随项目分发的数�
 | Blue Marble 全球底图（21600×10800，z0–z5 瓦片） | NASA Earth Observatory / Visible Earth | 公有领域（NASA 图像使用政策），建议保留 “NASA Blue Marble” 字样 |
 | Sentinel-2 cloudless（东亚 z5–z14 瓦片） | EOX IT Services GmbH（Sentinel-2 cloudless 2020/2024） | **CC BY 4.0**；必须注明 “Sentinel-2 cloudless by EOX IT Services GmbH (CC BY 4.0)”，并链接 https://s2maps.eu |
 | 本地 XYZ 瓦片（用户自备） | 用户提供 | 由用户自行确认版权 |
+| 北京正射影像（本机 `data/local/`） | 用户提供（ENVI 镶嵌，约 5 m） | **不随项目/Release 分发**；仅本机使用，版权与使用限制由数据提供方决定 |
 
 ## 矢量与地形
 

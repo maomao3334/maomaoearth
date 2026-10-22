@@ -720,6 +720,14 @@
         }
       }
     }
+    // 本地影像（如北京正射）应保持在卫星影像之上；地形/画质切换后重新提层。
+    try {
+      if (window.LELocalImagery && typeof window.LELocalImagery.raiseAll === 'function') {
+        window.LELocalImagery.raiseAll();
+      }
+    } catch (err) {
+      console.warn('[LETerrain] 提升本地影像层级失败', err);
+    }
   }
 
   /** 保证当前档位的影像层存在、可见，并按 主影像 → 宽域高清 → 超清 的顺序叠在最上层。 */

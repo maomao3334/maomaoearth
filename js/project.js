@@ -178,6 +178,7 @@
       if (layer.system) continue;
       if (DEFAULT_LAYER_IDS.has(layer.id)) continue;
       if (layer.id === 'markers') continue; // 标记点单独保存
+      if (layer.localImagery) continue; // 本地影像由 data/local 清单自动恢复
       if (layer.type === 'wind3d') continue; // 由 windninja 段记录
       if (isTerrainManaged(layer)) continue; // 由 settings.terrain.imagery 恢复
       project.layers.push(captureLayer(layer));
@@ -318,6 +319,7 @@
       if (layer.system) continue;
       if (DEFAULT_LAYER_IDS.has(layer.id)) continue;
       if (layer.type === 'wind3d') continue;
+      if (layer.localImagery) continue; // 本地影像由 data/local 清单自动恢复
       if (isTerrainManaged(layer)) continue;
       try {
         le.removeLayer(layer.id);

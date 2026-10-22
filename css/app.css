@@ -1107,3 +1107,20 @@ body {
 .draw-extra #draw-opacity { flex: 1; min-width: 80px; }
 .draw-check { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: #b9d7ee; white-space: nowrap; }
 .draw-feature-card { width: min(820px, 95vw); }
+
+/* ---------- 本地影像（仅本机） ---------- */
+.local-imagery-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
+.local-imagery-card { border: 1px solid var(--line); border-radius: 8px; padding: 8px 9px; background: #0e1721; }
+.local-imagery-card.loaded { border-color: rgba(126, 224, 192, .45); }
+.local-imagery-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.local-imagery-title { font-size: 13px; font-weight: 600; }
+.local-imagery-status { font-size: 10.5px; color: var(--muted); white-space: nowrap; }
+.local-imagery-card.loaded .local-imagery-status { color: var(--accent-2); }
+.local-imagery-meta { margin-top: 3px; color: var(--muted); font-size: 10.5px; line-height: 1.45; }
+.local-imagery-actions { display: flex; gap: 6px; margin-top: 7px; }
+.local-imagery-actions button {
+  flex: 1; height: 28px; border-radius: 6px; border: 1px solid #3b4c5e;
+  background: #1d2833; color: #e6eef7; cursor: pointer; font-size: 12px;
+}
+.local-imagery-actions button:hover { background: #1b2a3a; border-color: #32465e; }
+.local-imagery-actions button:disabled { opacity: .45; cursor: default; }

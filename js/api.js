@@ -47,7 +47,7 @@
   }
 
   var api = {
-    version: '0.7.0',
+    version: '0.8.0',
     on: on,
     ready: ready,
     whenReady: function (cb) { return ready().then(cb); },
@@ -242,6 +242,15 @@
       openDialog: function () { return requireModule('LEMBTiles', 'openDialog').openDialog(); },
       clear: function () { return requireModule('LEMBTiles', 'clear').clear(); },
       getState: function () { return requireModule('LEMBTiles', 'getState').getState(); },
+    },
+
+    /** 本地影像（data/local/imagery.json；仅本机，不进入发布包） */
+    localImagery: {
+      list: function () { return requireModule('LELocalImagery', 'list').list(); },
+      getState: function () { return requireModule('LELocalImagery', 'getState').getState(); },
+      load: function (id, opts) { return requireModule('LELocalImagery', 'load').load(id, opts || {}); },
+      unload: function (id, opts) { return requireModule('LELocalImagery', 'unload').unload(id, opts || {}); },
+      toggle: function (id) { return requireModule('LELocalImagery', 'toggle').toggle(id); },
     },
 
     /** 坐标标点 */

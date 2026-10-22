@@ -217,3 +217,17 @@ LEDraw.getStyle(); // { color, width, opacity, depthFail, vertexLabels }
 ```
 
 绘制点/线/面自动贴地；线/面顶点带“标记点 N”标签；要素列表支持改名/显隐/定位/删除。详见 [DRAW.md](DRAW.md)。
+
+## 本地影像（v0.8.0，仅本机）
+
+```js
+await MaoMaoEarth.ready();
+MaoMaoEarth.localImagery.getState(); // { manifest, datasets:[{id,name,loaded,bounds}] }
+MaoMaoEarth.localImagery.list();
+await MaoMaoEarth.localImagery.load('beijing-ortho', { fit: true });
+MaoMaoEarth.localImagery.unload('beijing-ortho');
+MaoMaoEarth.localImagery.toggle('beijing-ortho');
+```
+
+清单：`data/local/imagery.json`（被 `.gitignore` 排除）。底层 `window.LELocalImagery`，方法与上面一致，另有 `raiseAll()`。
+生成工具：`tools/prepare_pek_ortho.py`；详见 [LOCAL_IMAGERY.md](LOCAL_IMAGERY.md)。
