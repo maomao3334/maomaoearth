@@ -2,7 +2,7 @@
 
 > 完全离线、双击即用的 Windows 三维地理信息工具：本地地形、卫星影像、KML/KMZ、WindNinja/Wind3D 风场直读、粒子/风廓线、工程保存与离线出图。
 >
-> **v0.5.2** · Windows 10/11 · 无需安装、无需联网、无需构建
+> **v0.6.0** · Windows 10/11 · 无需安装、无需联网、无需构建
 
 ![Wind3D 风场与三维地形](docs/screenshots/01-wind3d-terrain.png)
 
@@ -25,6 +25,7 @@ MaomaoEarth（猫猫地球）是一个**本地优先**的三维地球应用，�
 
 - **三维地形**：全球 0.1° 底图 + 东亚 0.02° + 风场区 1″ 高精度网格；地形夸张、3D/2D 切换、地形阴影。
 - **离线影像**：NASA Blue Marble 全球底图；Sentinel-2 cloudless 东亚 z5–z8、宽域 z9–z12、风场区 z13–z14；支持本地 XYZ 目录与 GeoTIFF。
+- **坐标标点**：经纬度支持十进制度/度分秒切换、单行粘贴、地图选点；可自定义名称/备注/颜色，名称标签常显；支持标记点列表管理、拖拽、CSV/GeoJSON/KML 导出、CSV/GeoJSON 导入、工程保存（详见 docs/MARKERS.md）。
 - **底图显示修复**：低画质/无地形时国界 GeoJSON 面曾默认白色填充，盖住卫星底图；已显式改为只描边，并让缺失 S2 瓦片透明（详见 docs/MAP-DISPLAY-FIX.md）。
 - **超大 KML/KMZ 性能**：10 万级 Placemark 动画文件（如风场 timeline）按 Placemark 分片/快速解析、线动画用静态 `Primitive` 帧播放器；109 MB KML 实测从 12 s/2.4 FPS 降到 4 s/60 FPS（详见 docs/KML-PERF.md）。
 - **MBTiles 直读**：`MaoMaoEarth.exe mbtiles 文件.mbtiles` 后台启动本地瓦片服务（无命令行窗口），按 z/x/y 查 SQLite（winsqlite3，不整库载入）；支持 png/jpg/webp 栅格、**pbf/MVT 矢量瓦片**、**EPSG:3857 / EPSG:4326**、TMS/XYZ、图层透明度/排序。
@@ -59,6 +60,10 @@ MaomaoEarth（猫猫地球）是一个**本地优先**的三维地球应用，�
 | ![MBTiles](docs/screenshots/08-mbtiles.png) | ![MVT](docs/screenshots/09-mvt.png) |
 | 本地 SQLite 瓦片服务 + ImageryProvider | 纯 JS MVT 解码 + Canvas 栅格化 |
 
+| 坐标标点 | |
+|---|---|
+| ![坐标标点](docs/screenshots/13-markers.png) | 十进制度/度分秒 + 名称标签 + 列表管理 |
+
 ---
 
 ## 快速开始
@@ -66,7 +71,7 @@ MaomaoEarth（猫猫地球）是一个**本地优先**的三维地球应用，�
 ### 方式 A：下载 Release（推荐，普通用户）
 
 1. 打开仓库的 **Releases** 页面，下载：
-   - `maomaoearth-v0.5.2.zip`（代码/程序，含 `MaoMaoEarth.exe`）
+   - `maomaoearth-v0.6.0.zip`（代码/程序，含 `MaoMaoEarth.exe`）
    - `maomaoearth-data-<日期>.zip`（离线数据包，约 190 MB）
 2. 解压程序包到任意目录（路径尽量不含空格）。
 3. 把数据包解压到同一目录，得到 `data/public/...`（覆盖/合并 `data` 目录）。
@@ -259,6 +264,7 @@ local-earth/
   js/
     mvt.js                   # MVT 解码 + Canvas 栅格化（v0.5.0）
     mbtiles.js               # MBTiles 本地瓦片服务客户端（v0.5.0）
+    markers.js               # 坐标标点：DMS/列表/导入导出（v0.6.0）
     main.js                  # 启动、Cesium Viewer、LE API
     terrain.js               # 地形/影像/高度查询
     kml-native.js            # KML/KMZ 原生渲染
@@ -319,6 +325,7 @@ local-earth/
 - [MBTiles 说明与验证](docs/MBTILES.md)：本地 SQLite 瓦片服务、TMS、4326、MVT 测试记录
 - [KML/KMZ 性能优化](docs/KML-PERF.md)：分片/快速解析、静态线 Primitive、前后对比数据
 - [底图白块修复](docs/MAP-DISPLAY-FIX.md)：国界面填充、S2 缺失瓦片透明、低画质验证
+- [坐标标点](docs/MARKERS.md)：十进制度/度分秒、地图选点、列表/拖拽、导入导出
 - [MVT 解码/栅格化](docs/MVT.md)：pbf 瓦片支持范围与限制
 
 ---

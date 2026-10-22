@@ -183,3 +183,21 @@ MaoMaoEarth.mbtiles.clear();
 
 底层对象：`LEMBTiles`（`load/clear/getState/openDialog`）；矢量 pbf 走 `LEMvt.createImageryProvider`。
 支持 png/jpg/webp 栅格、pbf/MVT 矢量、EPSG:3857/4326；详见 [MBTILES.md](MBTILES.md)、[MVT.md](MVT.md)。
+
+## 坐标标点（v0.6.0）
+
+```js
+MaoMaoEarth.markers.add(record, { fly: true });
+MaoMaoEarth.markers.list();
+MaoMaoEarth.markers.remove(id);
+MaoMaoEarth.markers.clear();
+MaoMaoEarth.markers.openDialog(record?);
+MaoMaoEarth.markers.openList();
+MaoMaoEarth.markers.exportCsv();
+MaoMaoEarth.markers.exportGeoJSON();
+MaoMaoEarth.markers.exportKml();
+MaoMaoEarth.markers.importCsvText(text);
+```
+
+`record`：`{ name, lat, lon, note?, color?, heightMode:'clamp'|'absolute', height?, labelVisible? }`。
+底层 `window.LEMarkers` 另含 `parsePair/parseDms/formatDms/formatDecimal`。详见 [MARKERS.md](MARKERS.md)。

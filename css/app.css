@@ -1059,3 +1059,44 @@ body {
 .modal-actions { display: flex; gap: 8px; margin-top: 14px; }
 .modal-actions button { flex: 1; padding: 8px 10px; border-radius: 6px; border: 1px solid #3b4c5e; background: #1d2833; color: #e6eef7; cursor: pointer; }
 .modal-actions button.primary { background: #1769aa; border-color: #2c7fc4; }
+
+/* ---------- 坐标标点 ---------- */
+#marker-section .wide { margin-top: 6px; }
+.marker-card { width: min(620px, 94vw); }
+.marker-tabs { display: flex; gap: 6px; margin: 4px 0 12px; }
+.marker-tab { flex: 1; padding: 7px 10px; border: 1px solid rgba(120,170,220,.35); background: rgba(20,36,52,.7); color: #cfe6ff; border-radius: 6px; cursor: pointer; }
+.marker-tab.active { background: #2b6fb3; border-color: #5aa8ef; color: #fff; }
+.marker-row { display: flex; gap: 10px; align-items: flex-end; }
+.marker-row .field { flex: 1; }
+.marker-inline { display: flex; gap: 6px; align-items: center; }
+.marker-inline input { flex: 1; }
+.marker-preview { margin: 10px 0 4px; padding: 8px 10px; border-radius: 6px; background: rgba(20,36,52,.65); color: #d7ecff; font: 12px/1.7 Consolas, monospace; white-space: normal; }
+.marker-check { display: flex; align-items: center; gap: 6px; margin: 6px 0; color: #cfe6ff; font-size: 13px; }
+.marker-actions { flex-wrap: wrap; }
+.marker-list-card { width: min(860px, 96vw); }
+.marker-list-toolbar { display: flex; gap: 8px; margin-bottom: 8px; }
+.marker-list-toolbar input { flex: 1; }
+.marker-list-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+.marker-table-wrap { max-height: 52vh; overflow: auto; border: 1px solid rgba(120,170,220,.25); border-radius: 6px; }
+.marker-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.marker-table th, .marker-table td { padding: 7px 8px; border-bottom: 1px solid rgba(120,170,220,.16); text-align: left; vertical-align: top; }
+.marker-table th { position: sticky; top: 0; background: #172b3d; color: #d8ecff; z-index: 1; }
+.marker-table .marker-coord { font-family: Consolas, monospace; color: #bfe3ff; white-space: nowrap; }
+.marker-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; box-shadow: 0 0 0 1px rgba(255,255,255,.7); }
+.marker-note { color: #9db8cc; font-size: 11px; margin-top: 2px; }
+.marker-row-actions { white-space: nowrap; }
+.marker-row-actions .btn { padding: 3px 6px; margin: 0 2px; font-size: 11px; }
+.marker-row-actions .danger { color: #ff9c9c; }
+.marker-empty { color: #9db8cc; text-align: center; padding: 18px; }
+.marker-batch-card { width: min(620px, 94vw); }
+.marker-batch-card textarea { width: 100%; box-sizing: border-box; resize: vertical; font-family: Consolas, monospace; }
+
+/* 坐标标点：表单纵向布局修正 */
+.marker-card .field { display: block; margin-bottom: 8px; }
+.marker-card .field > label { display: block; margin-bottom: 3px; color: #b9d7ee; font-size: 12px; }
+.marker-card .marker-row { display: flex; gap: 10px; align-items: flex-start; }
+.marker-card .marker-row .field { flex: 1; }
+.marker-card .marker-row .field > label { white-space: nowrap; }
+.marker-card #marker-color { width: 100%; height: 32px; padding: 2px; }
+.marker-card #marker-name, .marker-card #marker-note, .marker-card #marker-lat, .marker-card #marker-lon,
+.marker-card #marker-lat-dms, .marker-card #marker-lon-dms { width: 100%; box-sizing: border-box; }

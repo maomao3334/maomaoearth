@@ -177,6 +177,7 @@
     for (const layer of le.listLayers()) {
       if (layer.system) continue;
       if (DEFAULT_LAYER_IDS.has(layer.id)) continue;
+      if (layer.id === 'markers') continue; // 标记点单独保存
       if (layer.type === 'wind3d') continue; // 由 windninja 段记录
       if (isTerrainManaged(layer)) continue; // 由 settings.terrain.imagery 恢复
       project.layers.push(captureLayer(layer));
@@ -187,6 +188,13 @@
         project.windninja = W.getProjectState();
       } catch (err) {
         console.warn('[LEProject] 抓取 Wind3D 状态失败', err);
+      }
+    }
+    if (window.LEMarkers && typeof LEMarkers.getProjectState === 'function') {
+      try {
+        project.markers = LEMarkers.getProjectState();
+      } catch (err) {
+        console.warn('[LEProject] 抓取标记点失败', err);
       }
     }
     return project;
@@ -383,6 +391,16 @@
     });
   }
 
+  async function applyMarkers(project, warnings) {
+    const M = window.LEMarkers;
+    if (!M || typeof M.restoreProjectState !== 'function') return;
+    try {
+      await M.restoreProjectState(project.markers || []);
+    } catch (err) {
+      warnings.push('标记点恢复失败：' + err.message);
+    }
+  }
+
   async function apply(project) {
     const le = state.le;
     if (!le || !le.viewer) throw new Error('应用尚未就绪');
@@ -390,6 +408,7 @@
     await applySettings(project, warnings);
     await applyLayers(project, warnings);
     await applyWindninja(project, warnings);
+    await applyMarkers(project, warnings);
     applyCamera(project);
     if (project.measure && project.measure.text) {
       warnings.push('测量结果仅作记录，未恢复几何：' + project.measure.text);

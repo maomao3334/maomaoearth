@@ -47,7 +47,7 @@
   }
 
   var api = {
-    version: '0.5.2',
+    version: '0.6.0',
     on: on,
     ready: ready,
     whenReady: function (cb) { return ready().then(cb); },
@@ -242,6 +242,22 @@
       openDialog: function () { return requireModule('LEMBTiles', 'openDialog').openDialog(); },
       clear: function () { return requireModule('LEMBTiles', 'clear').clear(); },
       getState: function () { return requireModule('LEMBTiles', 'getState').getState(); },
+    },
+
+    /** 坐标标点 */
+    markers: {
+      add: function (record, opts) { return requireModule('LEMarkers', 'add').add(record, opts); },
+      addMany: function (records, opts) { return requireModule('LEMarkers', 'addMany').addMany(records, opts); },
+      remove: function (id) { return requireModule('LEMarkers', 'remove').remove(id); },
+      clear: function () { return requireModule('LEMarkers', 'clear').clear(); },
+      list: function () { return requireModule('LEMarkers', 'list').list(); },
+      openDialog: function (record) { return requireModule('LEMarkers', 'openDialog').openDialog(record); },
+      openList: function () { return requireModule('LEMarkers', 'openList').openList(); },
+      getProjectState: function () { return requireModule('LEMarkers', 'getProjectState').getProjectState(); },
+      restoreProjectState: function (records) { return requireModule('LEMarkers', 'restoreProjectState').restoreProjectState(records); },
+      exportCsv: function () { return requireModule('LEMarkers', 'exportCsv').exportCsv(); },
+      exportGeoJSON: function () { return requireModule('LEMarkers', 'exportGeoJSON').exportGeoJSON(); },
+      exportKml: function () { return requireModule('LEMarkers', 'exportKml').exportKml(); },
     },
 
     /** 性能 */
