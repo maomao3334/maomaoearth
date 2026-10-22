@@ -201,3 +201,19 @@ MaoMaoEarth.markers.importCsvText(text);
 
 `record`：`{ name, lat, lon, note?, color?, heightMode:'clamp'|'absolute', height?, labelVisible? }`。
 底层 `window.LEMarkers` 另含 `parsePair/parseDms/formatDms/formatDecimal`。详见 [MARKERS.md](MARKERS.md)。
+
+## 绘制增强（v0.7.0）
+
+```js
+LEDraw.openList();
+LEDraw.renameFeature(feature, '新名称');
+LEDraw.setFeatureVisible(feature, false);
+LEDraw.zoomToFeature(feature);
+LEDraw.removeFeature(feature);
+LEDraw.downloadKML();
+LEDraw.downloadCSV();
+LEDraw.setVertexLabels(false);
+LEDraw.getStyle(); // { color, width, opacity, depthFail, vertexLabels }
+```
+
+绘制点/线/面自动贴地；线/面顶点带“标记点 N”标签；要素列表支持改名/显隐/定位/删除。详见 [DRAW.md](DRAW.md)。

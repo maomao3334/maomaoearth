@@ -22,6 +22,8 @@
     drag: null,
     pickHandler: null,
     dragHandler: null,
+    dblHandler: null,
+    savedDblClick: null,
     dialog: null,
     listDialog: null,
     batchDialog: null,
@@ -885,6 +887,61 @@
 
   /* ------------------------------ 拖拽 ------------------------------ */
 
+
+  function pickCartographicAt(viewer, screenPos) {
+    try {
+      const scene = viewer.scene;
+      const ray = viewer.camera.getPickRay(screenPos);
+      let cartesian = ray ? scene.globe.pick(ray, scene) : null;
+      if (!cartesian) cartesian = viewer.camera.pickEllipsoid(screenPos, scene.globe.ellipsoid);
+      if (!cartesian) return null;
+      const carto = C.Cartographic.fromCartesian(cartesian);
+      if (!carto) return null;
+      return { lat: C.Math.toDegrees(carto.latitude), lon: C.Math.toDegrees(carto.longitude) };
+    } catch (err) {
+      return null;
+    }
+  }
+
+  function bindDoubleClick(le) {
+    const viewer = viewerOf();
+    if (!viewer || state.dblHandler) return;
+    // 移除 Cesium 默认双击缩放，空闲双击用于快速标点
+    try {
+      const widget = viewer.cesiumWidget;
+      const handler = widget && widget.screenSpaceEventHandler;
+      if (handler) {
+        state.savedDblClick = handler.getInputAction(C.ScreenSpaceEventType.LEFT_DOUBLE_CLICK) || null;
+        if (state.savedDblClick) handler.removeInputAction(C.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
+      }
+    } catch (err) { /* ignore */ }
+    const handler = new C.ScreenSpaceEventHandler(viewer.scene.canvas);
+    state.dblHandler = handler;
+    handler.setInputAction(function (movement) {
+      if (window.LEDraw && typeof LEDraw.isActive === 'function' && LEDraw.isActive()) return;
+      try {
+        const picked = viewer.scene.pick(movement.position);
+        if (picked && picked.id && picked.id.__leMarkerId) {
+          const rec = state.markers.get(picked.id.__leMarkerId);
+          if (rec) { openDialog(rec); return; }
+        }
+        const hit = pickCartographicAt(viewer, movement.position);
+        if (!hit) return;
+        add({
+          name: '标记点 ' + (state.markers.size + 1),
+          lat: hit.lat,
+          lon: hit.lon,
+          color: COLOR_DEFAULT,
+          heightMode: 'clamp',
+        }, { silent: true, fly: false }).then(function (rec) {
+          openDialog(rec);
+        });
+      } catch (err) {
+        console.warn('[LEMarkers] 双击标点失败', err);
+      }
+    }, C.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
+  }
+
   function bindDrag(le) {
     const viewer = viewerOf();
     if (!viewer || state.dragHandler) return;
@@ -935,6 +992,7 @@
     if (!state.le || !state.le.viewer) return;
     ensureLayer(state.le).then(function () {
       bindDrag(state.le);
+      bindDoubleClick(state.le);
       updateCount();
     }).catch(function (err) {
       console.warn('[LEMarkers] 初始化失败', err);

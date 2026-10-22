@@ -20,7 +20,7 @@ using System.Threading;
 //   MaoMaoEarth.exe mbtiles <file> 启动本地 MBTiles 瓦片服务并打开应用
 class MaoMaoEarthLauncher
 {
-    const string Version = "0.6.0";
+    const string Version = "0.7.0";
     static string appDir;
     static string pidPath;
     static string logPath;

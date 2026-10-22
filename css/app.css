@@ -1100,3 +1100,10 @@ body {
 .marker-card #marker-color { width: 100%; height: 32px; padding: 2px; }
 .marker-card #marker-name, .marker-card #marker-note, .marker-card #marker-lat, .marker-card #marker-lon,
 .marker-card #marker-lat-dms, .marker-card #marker-lon-dms { width: 100%; box-sizing: border-box; }
+
+/* ---------- 绘制增强 ---------- */
+.brand-sub { font-size: 9px; opacity: .55; letter-spacing: .2px; font-weight: 400; }
+.draw-extra { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.draw-extra #draw-opacity { flex: 1; min-width: 80px; }
+.draw-check { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: #b9d7ee; white-space: nowrap; }
+.draw-feature-card { width: min(820px, 95vw); }

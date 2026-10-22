@@ -30,7 +30,9 @@
     savedDblClick: null,
     savedMeasureActive: false,
     hudTimer: null,
-    style: { color: '#ffd93b', width: 3 },
+    style: { color: '#ffd93b', width: 3, opacity: 1, depthFail: true, vertexLabels: true },
+    labelSeq: 0,
+    featureDialog: null,
   };
 
   function byId(id) {
@@ -131,7 +133,8 @@
               polygon: {
                 hierarchy: new C.PolygonHierarchy(positions),
                 material: colorOf(0.2),
-                perPositionHeight: true,
+                perPositionHeight: false,
+                heightReference: C.HeightReference.CLAMP_TO_GROUND,
                 outline: false,
               },
             })
@@ -146,7 +149,8 @@
               positions: ring,
               width: state.style.width,
               material: colorOf(0.9),
-              clampToGround: false,
+              clampToGround: true,
+              depthFailMaterial: depthFailMaterialOf(colorOf(1)),
             },
           })
         );
@@ -157,7 +161,8 @@
               positions: positions,
               width: state.style.width,
               material: colorOf(0.9),
-              clampToGround: false,
+              clampToGround: true,
+              depthFailMaterial: depthFailMaterialOf(colorOf(1)),
             },
           })
         );
@@ -166,13 +171,14 @@
       for (const p of state.pending) {
         state.previewEntities.push(
           viewer.entities.add({
-            position: cartesianOf(p),
+            position: C.Cartesian3.fromDegrees(p.lon, p.lat, 0),
             point: {
               pixelSize: 6,
               color: colorOf(1),
               outlineColor: C.Color.BLACK.withAlpha(0.8),
               outlineWidth: 1,
               disableDepthTestDistance: Number.POSITIVE_INFINITY,
+              heightReference: C.HeightReference.CLAMP_TO_GROUND,
             },
           })
         );
@@ -191,11 +197,19 @@
       return;
     }
     const modeLabel = state.mode === 'point' ? '点' : state.mode === 'line' ? '线' : '面';
-    const tips =
-      state.mode === 'point'
-        ? '单击地图添加点'
-        : '单击添加顶点 · 双击结束 · Esc 取消';
-    hud.textContent = '绘制' + modeLabel + '：' + tips + (state.pending.length ? '（已 ' + state.pending.length + ' 点）' : '');
+    const tips = state.mode === 'point' ? '单击地图添加点' : '单击添加顶点 · 双击结束 · Esc 取消';
+    let extra = '';
+    if (state.pending.length) {
+      const last = state.pending[state.pending.length - 1];
+      extra += ' · 已 ' + state.pending.length + ' 点';
+      extra += ' · 最后 ' + last.lat.toFixed(6) + ', ' + last.lon.toFixed(6);
+      if (state.mode === 'line' && state.pending.length >= 2) extra += ' · 长度 ' + formatDistance(lengthOf(state.pending));
+      if (state.mode === 'polygon' && state.pending.length >= 3) extra += ' · 面积 ' + formatArea(areaOf(state.pending));
+    }
+    if (state.hover) {
+      extra += ' · 光标 ' + state.hover.lat.toFixed(6) + ', ' + state.hover.lon.toFixed(6);
+    }
+    hud.textContent = '绘制' + modeLabel + '：' + tips + extra;
     hud.classList.remove('hidden');
   }
 
@@ -261,17 +275,76 @@
     return entity;
   }
 
-  function makePointEntity(point, color, width) {
+  function nextLabel() {
+    state.labelSeq += 1;
+    return '标记点 ' + state.labelSeq;
+  }
+
+  function styleAlpha(alpha) {
+    const a = state.style.opacity == null ? 1 : state.style.opacity;
+    return Math.max(0.05, Math.min(1, a * (alpha == null ? 1 : alpha)));
+  }
+
+  function depthFailMaterialOf(color) {
+    if (!state.style.depthFail) return undefined;
+    try {
+      return new C.PolylineDashMaterialProperty({
+        color: color.withAlpha(0.45),
+        dashLength: 16,
+      });
+    } catch (err) {
+      return color.withAlpha(0.45);
+    }
+  }
+
+  function labelOptions(text) {
+    return {
+      text: text,
+      font: '12px "Microsoft YaHei", sans-serif',
+      fillColor: C.Color.WHITE,
+      outlineColor: C.Color.BLACK,
+      outlineWidth: 2,
+      style: C.LabelStyle.FILL_AND_OUTLINE,
+      pixelOffset: new C.Cartesian2(0, -20),
+      verticalOrigin: C.VerticalOrigin.BOTTOM,
+      disableDepthTestDistance: Number.POSITIVE_INFINITY,
+      showBackground: true,
+      backgroundColor: C.Color.fromCssColorString('rgba(0,0,0,0.55)'),
+      heightReference: C.HeightReference.CLAMP_TO_GROUND,
+      distanceDisplayCondition: new C.DistanceDisplayCondition(0, 3000000),
+      show: state.style.vertexLabels !== false,
+    };
+  }
+
+  function makePointEntity(point, color, width, labelText) {
     const viewer = viewerOf();
     return tagDrawEntity(viewer.entities.add({
-      position: cartesianOf(point),
+      position: C.Cartesian3.fromDegrees(point.lon, point.lat, 0),
       point: {
         pixelSize: 9,
         color: color,
         outlineColor: C.Color.BLACK.withAlpha(0.85),
         outlineWidth: 2,
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        heightReference: C.HeightReference.CLAMP_TO_GROUND,
       },
+      label: labelOptions(labelText || nextLabel()),
+    }));
+  }
+
+  function makeVertexEntity(point, color, labelText) {
+    const viewer = viewerOf();
+    return tagDrawEntity(viewer.entities.add({
+      position: C.Cartesian3.fromDegrees(point.lon, point.lat, 0),
+      point: {
+        pixelSize: 7,
+        color: color,
+        outlineColor: C.Color.BLACK.withAlpha(0.85),
+        outlineWidth: 1.5,
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        heightReference: C.HeightReference.CLAMP_TO_GROUND,
+      },
+      label: labelOptions(labelText || nextLabel()),
     }));
   }
 
@@ -281,8 +354,9 @@
       polyline: {
         positions: positionsOf(points),
         width: width,
-        material: color,
-        clampToGround: false,
+        material: color.withAlpha(styleAlpha(1)),
+        clampToGround: true,
+        depthFailMaterial: depthFailMaterialOf(color),
       },
     }));
   }
@@ -296,8 +370,9 @@
         viewer.entities.add({
           polygon: {
             hierarchy: new C.PolygonHierarchy(positions),
-            material: color.withAlpha(0.25),
-            perPositionHeight: true,
+            material: color.withAlpha(styleAlpha(0.25)),
+            perPositionHeight: false,
+            heightReference: C.HeightReference.CLAMP_TO_GROUND,
             outline: false,
           },
         })
@@ -311,8 +386,9 @@
           polyline: {
             positions: ring,
             width: width,
-            material: color,
-            clampToGround: false,
+            material: color.withAlpha(styleAlpha(1)),
+            clampToGround: true,
+            depthFailMaterial: depthFailMaterialOf(color),
           },
         })
       )
@@ -326,15 +402,27 @@
     const color = colorOf(1);
     const width = state.style.width;
     let entities;
-    if (type === 'point') entities = [makePointEntity(points[0], color, width)];
-    else if (type === 'line') entities = [makeLineEntity(points, color, width)];
-    else entities = makePolygonEntities(points, color, width);
+    let labels = [];
+    if (type === 'point') {
+      entities = [makePointEntity(points[0], color, width, nextLabel())];
+      labels = entities.slice();
+    } else if (type === 'line') {
+      entities = [makeLineEntity(points, color, width)];
+      labels = points.map((p) => makeVertexEntity(p, color, nextLabel()));
+      entities = entities.concat(labels);
+    } else {
+      entities = makePolygonEntities(points, color, width);
+      labels = points.map((p) => makeVertexEntity(p, color, nextLabel()));
+      entities = entities.concat(labels);
+    }
     const feature = {
       id: 'draw-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7),
       name: name || nextName(type),
       type: type,
       points: points.map((p) => ({ lon: p.lon, lat: p.lat, height: p.height || 0 })),
       entities: entities,
+      labels: labels,
+      visible: true,
     };
     state.features.push(feature);
     // 给实体命名，方便 main.js 的实体选择提示与调试
@@ -373,10 +461,75 @@
 
   /* ------------------------------ 交互处理 ------------------------------ */
 
+  function lengthOf(points) {
+    if (!points || points.length < 2) return 0;
+    let total = 0;
+    for (let i = 1; i < points.length; i++) {
+      try {
+        const a = C.Cartographic.fromDegrees(points[i - 1].lon, points[i - 1].lat);
+        const b = C.Cartographic.fromDegrees(points[i].lon, points[i].lat);
+        total += new C.EllipsoidGeodesic(a, b).surfaceDistance;
+      } catch (err) { /* ignore */ }
+    }
+    return total;
+  }
+
+  function areaOf(points) {
+    if (!points || points.length < 3) return 0;
+    const R = 6378137;
+    let sum = 0;
+    for (let i = 0; i < points.length; i++) {
+      const a = points[i];
+      const b = points[(i + 1) % points.length];
+      const lon1 = a.lon * Math.PI / 180;
+      const lon2 = b.lon * Math.PI / 180;
+      const lat1 = a.lat * Math.PI / 180;
+      const lat2 = b.lat * Math.PI / 180;
+      sum += (lon2 - lon1) * (2 + Math.sin(lat1) + Math.sin(lat2));
+    }
+    return Math.abs(sum * R * R / 2);
+  }
+
+  function formatDistance(m) {
+    if (!isFinite(m)) return '--';
+    return m >= 1000 ? (m / 1000).toFixed(2) + ' km' : m.toFixed(0) + ' m';
+  }
+
+  function formatArea(m2) {
+    if (!isFinite(m2)) return '--';
+    return m2 >= 1e6 ? (m2 / 1e6).toFixed(2) + ' km²' : m2.toFixed(0) + ' m²';
+  }
+
+  function snapToVertex(screenPos) {
+    const viewer = viewerOf();
+    if (!viewer || !screenPos) return null;
+    let best = null;
+    let bestD = 14;
+    const groups = [state.pending].concat(state.features.map(function (f) { return f.points; }));
+    for (const points of groups) {
+      for (const p of points || []) {
+        try {
+          const w = C.SceneTransforms.worldToWindowCoordinates(
+            viewer.scene,
+            C.Cartesian3.fromDegrees(p.lon, p.lat, p.height || 0)
+          );
+          if (!w) continue;
+          const d = Math.hypot(w.x - screenPos.x, w.y - screenPos.y);
+          if (d < bestD) {
+            bestD = d;
+            best = { lon: p.lon, lat: p.lat, height: p.height || 0 };
+          }
+        } catch (err) { /* ignore */ }
+      }
+    }
+    return best;
+  }
+
   function addVertex(screenPos) {
     const hit = pickCartographic(screenPos);
     if (!hit) return false;
-    const point = { lon: hit.lon, lat: hit.lat, height: groundHeight(hit.lon, hit.lat) + 2 };
+    const snapped = snapToVertex(screenPos);
+    const point = snapped || { lon: hit.lon, lat: hit.lat, height: 0 };
     if (state.mode === 'point') {
       const feature = createFeature('point', [point]);
       if (feature) status('已添加 ' + feature.name + '（' + feature.points.length + ' 点）');
@@ -491,9 +644,10 @@
               state.hover = {
                 lon: hit.lon,
                 lat: hit.lat,
-                height: groundHeight(hit.lon, hit.lat) + 2,
+                height: 0,
               };
               buildPreview();
+              updateHud();
             }
           });
         }
@@ -719,6 +873,192 @@
 
   /* ------------------------------ 绑定/初始化 ------------------------------ */
 
+
+  function setVertexLabels(on) {
+    state.style.vertexLabels = !!on;
+    for (const feature of state.features) {
+      for (const entity of feature.labels || []) {
+        try {
+          if (entity.label) entity.label.show = state.style.vertexLabels;
+        } catch (err) { /* ignore */ }
+      }
+    }
+  }
+
+  function featureStats(feature) {
+    if (!feature) return { length: 0, area: 0 };
+    return {
+      length: feature.type === 'point' ? 0 : lengthOf(feature.points),
+      area: feature.type === 'polygon' ? areaOf(feature.points) : 0,
+    };
+  }
+
+  function typeLabel(type) {
+    return type === 'point' ? '点' : type === 'line' ? '线' : '面';
+  }
+
+  function zoomToFeature(feature) {
+    if (!feature || !feature.points.length) return false;
+    const le = getLE();
+    if (!le || !le.flyTo) return false;
+    if (feature.points.length === 1) {
+      const p = feature.points[0];
+      le.flyTo({ longitude: p.lon, latitude: p.lat, height: 5000 });
+      return true;
+    }
+    let west = Infinity, east = -Infinity, south = Infinity, north = -Infinity;
+    for (const p of feature.points) {
+      west = Math.min(west, p.lon); east = Math.max(east, p.lon);
+      south = Math.min(south, p.lat); north = Math.max(north, p.lat);
+    }
+    const pad = Math.max(0.001, Math.max(east - west, north - south) * 0.15);
+    le.flyTo({ rectangle: C.Rectangle.fromDegrees(west - pad, south - pad, east + pad, north + pad) });
+    return true;
+  }
+
+  function renameFeature(feature, newName) {
+    if (!feature) return false;
+    const name = String(newName || '').trim();
+    if (!name) return false;
+    feature.name = name;
+    for (const entity of feature.entities || []) {
+      try { entity.name = name; } catch (err) { /* ignore */ }
+    }
+    renderFeatureList();
+    return true;
+  }
+
+  function setFeatureVisible(feature, visible) {
+    if (!feature) return false;
+    feature.visible = visible !== false;
+    for (const entity of feature.entities || []) {
+      try { entity.show = feature.visible; } catch (err) { /* ignore */ }
+    }
+    renderFeatureList();
+    return true;
+  }
+
+  function ensureFeatureDialog() {
+    if (state.featureDialog) return state.featureDialog;
+    const dlg = document.createElement('div');
+    dlg.id = 'draw-feature-dialog';
+    dlg.className = 'modal hidden';
+    dlg.innerHTML =
+      '<div class="modal-card draw-feature-card">' +
+      '<h2>绘制要素 <span id="draw-feature-count" class="count">0</span></h2>' +
+      '<div class="marker-table-wrap"><table class="marker-table"><thead><tr><th>名称</th><th>类型</th><th>量算</th><th>操作</th></tr></thead><tbody id="draw-feature-tbody"></tbody></table></div>' +
+      '<div class="actions"><button type="button" class="btn" id="draw-feature-close">关闭</button></div>' +
+      '</div>';
+    document.body.appendChild(dlg);
+    state.featureDialog = dlg;
+    dlg.querySelector('#draw-feature-close').addEventListener('click', function () { dlg.classList.add('hidden'); });
+    dlg.querySelector('#draw-feature-tbody').addEventListener('click', function (ev) {
+      const btn = ev.target.closest('button[data-draw-action]');
+      if (!btn) return;
+      const id = btn.getAttribute('data-id');
+      const action = btn.getAttribute('data-draw-action');
+      const feature = state.features.find(function (f) { return f.id === id; });
+      if (!feature) return;
+      if (action === 'zoom') zoomToFeature(feature);
+      else if (action === 'rename') {
+        const name = window.prompt('重命名要素', feature.name);
+        if (name) renameFeature(feature, name);
+      } else if (action === 'toggle') setFeatureVisible(feature, feature.visible === false);
+      else if (action === 'delete') {
+        removeFeature(feature);
+        renderFeatureList();
+      }
+    });
+    return dlg;
+  }
+
+  function openFeatureList() {
+    const dlg = ensureFeatureDialog();
+    dlg.classList.remove('hidden');
+    renderFeatureList();
+  }
+
+  function renderFeatureList() {
+    const dlg = state.featureDialog;
+    if (!dlg) return;
+    const tbody = dlg.querySelector('#draw-feature-tbody');
+    const count = dlg.querySelector('#draw-feature-count');
+    if (count) count.textContent = String(state.features.length);
+    if (!tbody) return;
+    if (!state.features.length) {
+      tbody.innerHTML = '<tr><td colspan="4" class="marker-empty">暂无绘制要素</td></tr>';
+      return;
+    }
+    tbody.innerHTML = state.features.map(function (f) {
+      const s = featureStats(f);
+      const stat = f.type === 'point' ? (f.points[0] ? f.points[0].lat.toFixed(5) + ', ' + f.points[0].lon.toFixed(5) : '--')
+        : f.type === 'line' ? formatDistance(s.length)
+        : formatArea(s.area);
+      return '<tr>' +
+        '<td>' + escapeText(f.name) + '</td>' +
+        '<td>' + typeLabel(f.type) + '</td>' +
+        '<td class="marker-coord">' + stat + '</td>' +
+        '<td class="marker-row-actions">' +
+        '<button type="button" class="btn subtle" data-draw-action="zoom" data-id="' + escapeText(f.id) + '">定位</button>' +
+        '<button type="button" class="btn subtle" data-draw-action="rename" data-id="' + escapeText(f.id) + '">改名</button>' +
+        '<button type="button" class="btn subtle" data-draw-action="toggle" data-id="' + escapeText(f.id) + '">' + (f.visible === false ? '显示' : '隐藏') + '</button>' +
+        '<button type="button" class="btn subtle danger" data-draw-action="delete" data-id="' + escapeText(f.id) + '">删除</button>' +
+        '</td></tr>';
+    }).join('');
+  }
+
+  function escapeText(text) {
+    return String(text == null ? '' : text).replace(/[&<>"']/g, function (ch) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch];
+    });
+  }
+
+  function downloadText(text, filename, mime) {
+    const blob = new Blob([text], { type: mime || 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(url); if (a.parentNode) a.parentNode.removeChild(a); }, 800);
+  }
+
+  function downloadKML() {
+    const placemarks = state.features.map(function (f) {
+      const coords = f.points.map(function (p) { return p.lon.toFixed(8) + ',' + p.lat.toFixed(8) + ',' + (p.height || 0); });
+      let geom = '';
+      if (f.type === 'point') {
+        geom = '<Point><coordinates>' + coords[0] + '</coordinates></Point>';
+      } else if (f.type === 'line') {
+        geom = '<LineString><tessellate>1</tessellate><coordinates>' + coords.join(' ') + '</coordinates></LineString>';
+      } else {
+        const ring = coords.slice();
+        if (ring.length) ring.push(ring[0]);
+        geom = '<Polygon><outerBoundaryIs><LinearRing><coordinates>' + ring.join(' ') + '</coordinates></LinearRing></outerBoundaryIs></Polygon>';
+      }
+      return '<Placemark><name>' + escapeText(f.name) + '</name>' + geom + '</Placemark>';
+    }).join('');
+    const kml = '<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>MaomaoEarth 绘制要素</name>' + placemarks + '</Document></kml>';
+    downloadText(kml, 'draw-' + Date.now() + '.kml', 'application/vnd.google-earth.kml+xml;charset=utf-8');
+    return { count: state.features.length };
+  }
+
+  function downloadCSV() {
+    const rows = [['feature', 'type', 'vertex', 'latitude', 'longitude', 'height', 'length_m', 'area_m2']];
+    state.features.forEach(function (f) {
+      const s = featureStats(f);
+      f.points.forEach(function (p, i) {
+        rows.push([f.name, f.type, i + 1, p.lat.toFixed(8), p.lon.toFixed(8), p.height || 0, s.length.toFixed(2), s.area.toFixed(2)]);
+      });
+    });
+    const text = rows.map(function (row) {
+      return row.map(function (v) { return '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"'; }).join(',');
+    }).join('\r\n');
+    downloadText('\ufeff' + text, 'draw-' + Date.now() + '.csv', 'text/csv;charset=utf-8');
+    return { count: state.features.length };
+  }
+
   function bindUI() {
     if (state.bound) return;
     state.bound = true;
@@ -769,6 +1109,39 @@
           });
       });
     }
+    const opacityInput = byId('draw-opacity');
+    if (opacityInput) {
+      opacityInput.addEventListener('input', function () {
+        const v = Number(opacityInput.value);
+        if (isFinite(v)) state.style.opacity = Math.max(0.05, Math.min(1, v));
+      });
+      const v = Number(opacityInput.value);
+      if (isFinite(v)) state.style.opacity = Math.max(0.05, Math.min(1, v));
+    }
+    const depthFailInput = byId('draw-depthfail');
+    if (depthFailInput) {
+      depthFailInput.addEventListener('change', function () { state.style.depthFail = !!depthFailInput.checked; });
+      state.style.depthFail = depthFailInput.checked !== false;
+    }
+    const vertexLabelsInput = byId('draw-vertex-labels');
+    if (vertexLabelsInput) {
+      vertexLabelsInput.addEventListener('change', function () { setVertexLabels(!!vertexLabelsInput.checked); });
+      state.style.vertexLabels = vertexLabelsInput.checked !== false;
+    }
+    const listBtn = byId('btn-draw-list');
+    if (listBtn) listBtn.addEventListener('click', openFeatureList);
+    const kmlBtn = byId('btn-draw-export-kml');
+    if (kmlBtn) kmlBtn.addEventListener('click', function () {
+      const r = downloadKML();
+      const le = getLE();
+      if (le && le.toast) le.toast('KML 已导出（' + r.count + ' 个要素）', 'ok', 3000);
+    });
+    const csvBtn = byId('btn-draw-export-csv');
+    if (csvBtn) csvBtn.addEventListener('click', function () {
+      const r = downloadCSV();
+      const le = getLE();
+      if (le && le.toast) le.toast('CSV 已导出（' + r.count + ' 个要素）', 'ok', 3000);
+    });
     const colorSelect = byId('draw-color');
     if (colorSelect) {
       colorSelect.addEventListener('change', () => {
@@ -827,10 +1200,19 @@
     list,
     getFeatures,
     downloadGeoJSON,
+    downloadKML,
+    downloadCSV,
+    openList: openFeatureList,
+    renameFeature,
+    removeFeature,
+    setFeatureVisible,
+    zoomToFeature,
+    featureStats,
+    setVertexLabels,
     isActive: () => !!state.mode,
     getMode: () => state.mode,
     getPending: () => state.pending.length,
-    getStyle: () => ({ color: state.style.color, width: state.style.width }),
+    getStyle: () => ({ color: state.style.color, width: state.style.width, opacity: state.style.opacity, depthFail: state.style.depthFail, vertexLabels: state.style.vertexLabels }),
   };
 
   // 模块自行初始化
